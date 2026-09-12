@@ -1,0 +1,3 @@
+package com.litha.api.controller;
+import com.litha.api.model.MemoryPhoto; import com.litha.api.repository.MemoryPhotoRepository; import org.springframework.data.jpa.repository.JpaRepository; import org.springframework.web.bind.annotation.*; import java.util.List;
+@RestController @RequestMapping("/api/memory-photos") public class MemoryPhotoController extends CrudController<MemoryPhoto> { private final MemoryPhotoRepository repo; public MemoryPhotoController(MemoryPhotoRepository repo) { this.repo = repo; } protected JpaRepository<MemoryPhoto,Long> repository() { return repo; } @GetMapping(params="memoryId") public List<MemoryPhoto> byMemory(@RequestParam Long memoryId) { return repo.findByMemoryIdOrderByDisplayOrder(memoryId); } }
