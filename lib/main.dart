@@ -1396,17 +1396,35 @@ class StoneCard extends StatelessWidget {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(
-                  child: imageUrl == null
-                      ? Container(
-                          color: imageBg,
-                          alignment: Alignment.center,
-                          child: Icon(Icons.diamond_outlined,
-                              size: 42, color: accent))
-                      : Image.network(imageUrl,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              Container(color: imageBg))),
+                child: Stack(children: [
+                  Positioned.fill(
+                    child: imageUrl == null
+                        ? Container(
+                            color: imageBg,
+                            alignment: Alignment.center,
+                            child: Icon(Icons.diamond_outlined,
+                                size: 42, color: accent))
+                        : Image.network(imageUrl,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                Container(color: imageBg)),
+                  ),
+                  // Vignette
+                  Positioned.fill(
+                      child: DecoratedBox(
+                          decoration: BoxDecoration(
+                              gradient: RadialGradient(
+                                  center: Alignment.center,
+                                  radius: 1.0,
+                                  colors: [
+                                Colors.transparent,
+                                Colors.transparent,
+                                Colors.black.withValues(alpha: .28),
+                              ],
+                                  stops: const [0.0, 0.55, 1.0])))),
+                ]),
+              ),
               Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(stone['name'] ?? 'Unnamed stone',
@@ -1955,29 +1973,46 @@ class HuntImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext c) {
-    final fallback = Container(
-        color: imageBg,
-        alignment: Alignment.center,
-        child: Icon(Icons.explore_outlined,
-            color: accent, size: size == null ? 42 : 28));
-    if (url == null || url!.isEmpty) {
-      return size == null
-          ? fallback
-          : SizedBox(
-              width: size,
-              height: size,
-              child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10), child: fallback));
-    }
-    final image = Image.network(url!,
-        fit: BoxFit.cover, errorBuilder: (_, __, ___) => fallback);
-    return size == null
-        ? image
-        : SizedBox(
-            width: size,
-            height: size,
-            child: ClipRRect(
-                borderRadius: BorderRadius.circular(10), child: image));
+    final sz = size ?? 56.0;
+    final fallbackIcon = Icon(Icons.explore_outlined,
+        color: accent, size: size == null ? 42 : 28);
+    Widget inner = url != null && url!.isNotEmpty
+        ? Image.network(url!,
+            width: sz,
+            height: sz,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                Container(color: imageBg, alignment: Alignment.center,
+                    child: fallbackIcon))
+        : Container(color: imageBg, alignment: Alignment.center,
+            child: fallbackIcon);
+
+    return Container(
+      width: sz,
+      height: sz,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: .18), width: 1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: Stack(children: [
+          SizedBox(width: sz, height: sz, child: inner),
+          Positioned.fill(
+              child: DecoratedBox(
+                  decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 1.0,
+                          colors: [
+                        Colors.transparent,
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: .28),
+                      ],
+                          stops: const [0.0, 0.55, 1.0])))),
+        ]),
+      ),
+    );
   }
 }
 
@@ -3377,6 +3412,8 @@ class _HalfCirclePainter extends CustomPainter {
 }
 
 // ── Faceted gem swatch ───────────────────────────────────────────────────────
+// ── Stone swatch — rounded rect, hairline border, vignette ───────────────────
+// Used for all small stone thumbnails throughout the app.
 class FacetedSwatch extends StatelessWidget {
   const FacetedSwatch({
     required this.width,
@@ -3384,9 +3421,10 @@ class FacetedSwatch extends StatelessWidget {
     this.imageUrl,
     this.fallbackColor,
     this.child,
+    this.radius = 14.0,
     super.key,
   });
-  final double width, height;
+  final double width, height, radius;
   final String? imageUrl;
   final Color? fallbackColor;
   final Widget? child;
@@ -3394,6 +3432,8 @@ class FacetedSwatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fill = fallbackColor ?? imageBg;
+    final br = BorderRadius.circular(radius);
+
     Widget content = imageUrl != null && imageUrl!.isNotEmpty
         ? Image.network(imageUrl!,
             width: width,
@@ -3410,47 +3450,35 @@ class FacetedSwatch extends StatelessWidget {
                     child: Icon(Icons.diamond_outlined,
                         color: accent.withValues(alpha: .5),
                         size: width * .35)));
-    return ClipPath(
-      clipper: _GemClipper(),
-      child: Stack(children: [
-        SizedBox(width: width, height: height, child: content),
-        // Light sheen overlay
-        Positioned.fill(
-            child: DecoratedBox(
-                decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                      Colors.white.withValues(alpha: .10),
-                      Colors.transparent,
-                      Colors.transparent,
-                    ],
-                        stops: const [0, .45, 1])))),
-      ]),
+
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        borderRadius: br,
+        border: Border.all(color: accent.withValues(alpha: .18), width: 1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius - 1),
+        child: Stack(children: [
+          SizedBox(width: width, height: height, child: content),
+          // Vignette — edges darken toward frame, centre stays clear
+          Positioned.fill(
+              child: DecoratedBox(
+                  decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                          center: Alignment.center,
+                          radius: 1.0,
+                          colors: [
+                        Colors.transparent,
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: .28),
+                      ],
+                          stops: const [0.0, 0.55, 1.0])))),
+        ]),
+      ),
     );
   }
-}
-
-class _GemClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size s) {
-    final w = s.width;
-    final h = s.height;
-    return Path()
-      ..moveTo(w * .18, 0)
-      ..lineTo(w * .82, 0)
-      ..lineTo(w, h * .22)
-      ..lineTo(w, h * .78)
-      ..lineTo(w * .82, h)
-      ..lineTo(w * .12, h)
-      ..lineTo(0, h * .78)
-      ..lineTo(0, h * .22)
-      ..close();
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 // ── Hero frame (bordered panel with gradient wash) ────────────────────────────
