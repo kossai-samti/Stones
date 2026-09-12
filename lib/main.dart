@@ -3197,10 +3197,10 @@ class _StoneWizardState extends State<StoneWizard> {
   }
 }
 
-void stoneForm(BuildContext c, Future<void> Function() done,
-    {Map<String, dynamic>? initial}) {
+Future<void> stoneForm(BuildContext c, Future<void> Function() done,
+    {Map<String, dynamic>? initial}) async {
   if (initial == null) {
-    Navigator.push(
+    await Navigator.push(
         c, MaterialPageRoute(builder: (_) => StoneWizard(onSaved: done)));
     return;
   }
@@ -3214,7 +3214,7 @@ void stoneForm(BuildContext c, Future<void> Function() done,
   String rawKind = (initial['acquisitionType'] ?? 'FOUND').toString().toUpperCase();
   if (rawKind == 'GIFTED') rawKind = 'GIFT';
   String kind = ['FOUND', 'BOUGHT', 'GIFT', 'OTHER'].contains(rawKind) ? rawKind : 'FOUND';
-  showDialog(
+  await showDialog(
       context: c,
       builder: (x) => StatefulBuilder(
           builder: (x, set) => AlertDialog(
