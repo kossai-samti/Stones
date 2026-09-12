@@ -71,39 +71,54 @@ class LithaTheme {
   const LithaTheme({
     required this.name,
     required this.bg,
+    required this.surface,
     required this.card,
     required this.accent,
+    required this.primary,
+    required this.deep,
     required this.muted,
     required this.imageBg,
+    required this.border,
+    required this.textColor,
     required this.brightness,
     required this.circle1,
     required this.circle2,
   });
   final String name;
-  final Color bg, card, accent, muted, imageBg;
+  final Color bg, surface, card, accent, primary, deep, muted, imageBg, border, textColor;
   final Brightness brightness;
   final Color circle1, circle2;
 }
 
 const _gothicTheme = LithaTheme(
   name: 'Gothic',
-  bg: Color(0xff0d0a12),
-  card: Color(0xff211a29),
-  accent: Color(0xffb98be6),
-  muted: Color(0xffa79bae),
+  bg: Color(0xff0D0A12),
+  surface: Color(0xff17121D),
+  card: Color(0xff211A29),
+  accent: Color(0xffB98BE6),
+  primary: Color(0xff8B5FBF),
+  deep: Color(0xff4C2868),
+  muted: Color(0xffA79BAE),
   imageBg: Color(0xff30243b),
+  border: Color(0xff33283B),
+  textColor: Color(0xffF1EAF5),
   brightness: Brightness.dark,
-  circle1: Color(0xffb98be6),
-  circle2: Color(0xff0d0a12),
+  circle1: Color(0xffB98BE6),
+  circle2: Color(0xff0D0A12),
 );
 
 const _romanticTheme = LithaTheme(
   name: 'Romantic',
   bg: Color(0xffFFF7FA),
+  surface: Color(0xffFFF0F5),
   card: Color(0xffFFFFFF),
   accent: Color(0xffD98FA8),
+  primary: Color(0xffC56F91),
+  deep: Color(0xff8E526C),
   muted: Color(0xff8C737D),
   imageBg: Color(0xffF3C9D7),
+  border: Color(0xffE8C5D3),
+  textColor: Color(0xff33242B),
   brightness: Brightness.light,
   circle1: Color(0xffD98FA8),
   circle2: Color(0xff8E526C),
@@ -112,10 +127,15 @@ const _romanticTheme = LithaTheme(
 const _botanicalTheme = LithaTheme(
   name: 'Botanical',
   bg: Color(0xffFAF8F2),
+  surface: Color(0xffF3F0E8),
   card: Color(0xffFFFFFF),
   accent: Color(0xff9BAF91),
+  primary: Color(0xff7A9470),
+  deep: Color(0xff60485D),
   muted: Color(0xff7C8075),
   imageBg: Color(0xffEEF1E8),
+  border: Color(0xffD5D9CC),
+  textColor: Color(0xff2A2E26),
   brightness: Brightness.light,
   circle1: Color(0xff9BAF91),
   circle2: Color(0xff60485D),
@@ -145,10 +165,15 @@ Future<void> _saveTheme(LithaTheme t) async {
 
 // Shortcut getters — read from the active theme. NOT const.
 Color get bg => _themeNotifier.value.bg;
+Color get surface => _themeNotifier.value.surface;
 Color get card => _themeNotifier.value.card;
 Color get accent => _themeNotifier.value.accent;
+Color get primary => _themeNotifier.value.primary;
+Color get deep => _themeNotifier.value.deep;
 Color get muted => _themeNotifier.value.muted;
 Color get imageBg => _themeNotifier.value.imageBg;
+Color get borderColor => _themeNotifier.value.border;
+Color get textColor => _themeNotifier.value.textColor;
 
 // ── Typography helpers ────────────────────────────────────────────────────────
 // Display serif — Cormorant Garamond
@@ -300,17 +325,17 @@ class _ShellState extends State<Shell> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [accent, const Color(0xff7B4FB8)],
+                      colors: [primary, deep],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     border: Border.all(
-                        color: accent.withValues(alpha: .35), width: 1),
+                        color: primary.withValues(alpha: .40), width: 1),
                     boxShadow: [
                       BoxShadow(
-                          color: accent.withValues(alpha: .40),
-                          blurRadius: 18,
-                          spreadRadius: 2),
+                          color: primary.withValues(alpha: .45),
+                          blurRadius: 20,
+                          spreadRadius: 3),
                     ],
                   ),
                   child: const Icon(Icons.add, color: Colors.white),
@@ -1001,7 +1026,6 @@ class Hunt extends StatefulWidget {
 }
 
 class _HuntState extends State<Hunt> {
-  bool showGrid = false;
   bool reverse = false;
   String q = '';
   HuntSort sort = HuntSort.date;
@@ -1054,93 +1078,172 @@ class _HuntState extends State<Hunt> {
 
   @override
   Widget build(BuildContext c) => SafeArea(
-          child: Column(children: [
+      child: Column(children: [
+        // ── Header ────────────────────────────────────────────────────────
         Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 12, 14),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          padding: const EdgeInsets.fromLTRB(20, 24, 12, 0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Row(children: [
-                      Icon(Icons.explore_outlined, size: 12, color: muted),
+                      Icon(Icons.search, size: 12, color: muted),
                       const SizedBox(width: 6),
-                      Text('Things you are looking for',
+                      Text('Still searching',
                           style: TextStyle(fontSize: 13, color: muted)),
                     ]),
                     const SizedBox(height: 3),
-                    Text('The Hunt', style: serif(28, weight: FontWeight.w600)),
-                  ])),
+                    Text('The Hunt',
+                        style: serif(28, weight: FontWeight.w600)),
+                    const SizedBox(height: 2),
+                    Text('Things you are looking for — and have found.',
+                        style: serif(13,
+                            style: FontStyle.italic, color: muted)),
+                  ],
+                ),
+              ),
+              // Sort controls — kept, just repositioned
               IconButton(
                   tooltip: 'Sort hunts',
                   onPressed: chooseSort,
-                  icon: const Icon(Icons.sort_rounded)),
+                  icon: Icon(Icons.sort_rounded, color: muted, size: 20)),
               IconButton(
-                  tooltip:
-                      reverse ? 'Use normal sort order' : 'Reverse sort order',
+                  tooltip: reverse
+                      ? 'Use normal sort order'
+                      : 'Reverse sort order',
                   onPressed: () => setState(() => reverse = !reverse),
-                  icon: Icon(reverse
-                      ? Icons.arrow_upward_rounded
-                      : Icons.arrow_downward_rounded)),
-              IconButton(
-                  tooltip: 'Grid view',
-                  isSelected: showGrid,
-                  onPressed: () => setState(() => showGrid = true),
-                  icon: const Icon(Icons.grid_view_rounded)),
-              IconButton(
-                  tooltip: 'List view',
-                  isSelected: !showGrid,
-                  onPressed: () => setState(() => showGrid = false),
-                  icon: const Icon(Icons.view_list_rounded))
-            ])),
-        Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: TextField(
-                onChanged: (value) => setState(() => q = value),
-                decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    hintText: 'Search the hunt'))),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-          child: SegmentedButton<HuntFilter>(
-            segments: HuntFilter.values
-                .map((value) => ButtonSegment(
-                      value: value,
-                      label: Text(value.label),
-                    ))
-                .toList(),
-            selected: {filter},
-            onSelectionChanged: (value) => setState(() => filter = value.first),
+                  icon: Icon(
+                      reverse
+                          ? Icons.arrow_upward_rounded
+                          : Icons.arrow_downward_rounded,
+                      color: muted,
+                      size: 20)),
+            ],
           ),
         ),
+        const SizedBox(height: 14),
+
+        // ── Search bar — matches Stones style ─────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: TextField(
+            onChanged: (v) => setState(() => q = v),
+            style: const TextStyle(fontSize: 14),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search, size: 18),
+              hintText: 'Search the hunt',
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              filled: true,
+              fillColor: card,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide:
+                    BorderSide(color: borderColor, width: 1),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide:
+                    BorderSide(color: borderColor, width: 1),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Filter chips — matches Stones style ───────────────────────────
+        SizedBox(
+          height: 36,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            children: [
+              _HuntChip('All', HuntFilter.all, filter,
+                  () => setState(() => filter = HuntFilter.all)),
+              const SizedBox(width: 8),
+              _HuntChip('Not found', HuntFilter.searching, filter,
+                  () => setState(() => filter = HuntFilter.searching)),
+              const SizedBox(width: 8),
+              _HuntChip('Found', HuntFilter.found, filter,
+                  () => setState(() => filter = HuntFilter.found)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // ── List ──────────────────────────────────────────────────────────
         Expanded(
-            child: RefreshIndicator(
-                onRefresh: widget.refresh,
-                child: sortedItems.isEmpty
-                    ? ListView(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                        children: [
-                            Empty(widget.items.isEmpty
-                                ? 'What are you looking for?'
-                                : 'No hunt items match your search.')
-                          ])
-                    : showGrid
-                        ? GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 12,
-                                    mainAxisSpacing: 12,
-                                    childAspectRatio: .68),
-                            itemCount: sortedItems.length,
-                            itemBuilder: (_, i) => HuntCard(
-                                sortedItems[i], widget.stones, widget.refresh))
-                        : ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                            itemCount: sortedItems.length,
-                            itemBuilder: (_, i) => HuntTile(sortedItems[i],
-                                widget.stones, widget.refresh))))
+          child: RefreshIndicator(
+            onRefresh: widget.refresh,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
+              itemCount:
+                  sortedItems.isEmpty ? 1 : sortedItems.length + 1,
+              itemBuilder: (_, i) {
+                // Last item: dashed add button
+                if (i == sortedItems.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: GestureDetector(
+                      onTap: () => huntForm(c, widget.refresh),
+                      child: Container(
+                        width: double.infinity,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: accent.withValues(alpha: .35),
+                            width: 1.5,
+                            strokeAlign:
+                                BorderSide.strokeAlignInside,
+                          ),
+                          // Dashed look via decoration is not
+                          // natively dashed in Flutter — use a
+                          // CustomPainter instead:
+                        ),
+                        child: CustomPaint(
+                          painter: _DashBorderPainter(
+                              color: accent.withValues(alpha: .35),
+                              radius: 14),
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add,
+                                    size: 16,
+                                    color:
+                                        accent.withValues(alpha: .7)),
+                                const SizedBox(width: 6),
+                                Text('Add to the hunt',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: accent
+                                            .withValues(alpha: .7))),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                // Empty state
+                if (sortedItems.isEmpty) {
+                  return Empty(widget.items.isEmpty
+                      ? 'What are you looking for?'
+                      : 'No hunt items match your search.');
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: HuntTile(
+                      sortedItems[i], widget.stones, widget.refresh),
+                );
+              },
+            ),
+          ),
+        ),
       ]));
 }
 
@@ -1874,6 +1977,7 @@ class HuntTile extends StatelessWidget {
   final Map<String, dynamic> h;
   final List<Map<String, dynamic>> stones;
   final Future<void> Function() refresh;
+
   Future<void> mark(BuildContext c) async {
     await setHuntFound(c, h, stones, refresh);
   }
@@ -1885,39 +1989,151 @@ class HuntTile extends StatelessWidget {
     await refresh();
   }
 
+  bool get isFound => h['status'] == 'FOUND';
+
   @override
-  Widget build(BuildContext c) => Card(
-      color: card,
-      child: ListTile(
-          contentPadding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
-          leading: HuntImage(h['referenceImageUrl'], size: 52),
-          title: Text(h['name'] ?? ''),
-          subtitle: Text(
-              h['status'] == 'FOUND'
-                  ? 'FOUND'
-                  : '${huntPriority(h)} · ${huntPriorityLabels[huntPriority(h) - 1]}\n${h['description'] ?? 'Still searching'}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis),
-          onTap: () => Navigator.push(
-              c,
-              MaterialPageRoute(
-                  builder: (_) => HuntDetail(h, stones, refresh))),
-          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-            IconButton(
-                tooltip: h['status'] == 'FOUND'
-                    ? 'Mark as searching'
-                    : 'Mark as found',
-                onPressed: () => mark(c),
-                icon: Icon(h['status'] == 'FOUND'
-                    ? Icons.undo_rounded
-                    : Icons.task_alt_rounded),
-                color: accent),
-            IconButton(
-                tooltip: 'Delete hunt',
-                onPressed: () => delete(c),
-                icon: const Icon(Icons.delete_outline),
-                color: Colors.redAccent)
-          ])));
+  Widget build(BuildContext c) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          c, MaterialPageRoute(builder: (_) => HuntDetail(h, stones, refresh))),
+      child: Container(
+        decoration: BoxDecoration(
+          color: card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          // Photo panel
+          HuntImage(h['referenceImageUrl'], size: 84),
+          const SizedBox(width: 14),
+
+          // Text block
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  h['name'] ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isFound
+                      ? 'Found it ✓'
+                      : (h['description']?.toString().isNotEmpty == true
+                          ? h['description']
+                          : 'Still searching…'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: serif(13,
+                      style: FontStyle.italic, color: muted),
+                ),
+                const SizedBox(height: 10),
+                // Outline pill — marks found / reverts to searching
+                GestureDetector(
+                  onTap: () => mark(c),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: accent, width: 1),
+                    ),
+                    child: Text(
+                      isFound ? 'Unmark' : 'Mark as found',
+                      style: TextStyle(fontSize: 11, color: accent),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Delete (kept, tucked to the right)
+          IconButton(
+            tooltip: 'Delete',
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            onPressed: () => delete(c),
+            icon: Icon(Icons.delete_outline,
+                size: 18, color: muted.withValues(alpha: .5)),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// Dashed border painter for the add-to-hunt button
+class _DashBorderPainter extends CustomPainter {
+  const _DashBorderPainter({required this.color, required this.radius});
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    const dashLen = 6.0;
+    const gapLen = 4.0;
+    final rr = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0.75, 0.75, size.width - 1.5, size.height - 1.5),
+        Radius.circular(radius));
+    final path = Path()..addRRect(rr);
+    final metrics = path.computeMetrics();
+    for (final m in metrics) {
+      double dist = 0;
+      while (dist < m.length) {
+        canvas.drawPath(
+            m.extractPath(dist, dist + dashLen), paint);
+        dist += dashLen + gapLen;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class _HuntChip extends StatelessWidget {
+  const _HuntChip(this.label, this.value, this.current, this.onTap);
+  final String label;
+  final HuntFilter value, current;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = value == current;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: active ? accent : accent.withValues(alpha: .3),
+              width: 1),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+              fontSize: 12,
+              color: active ? card : muted,
+              fontWeight:
+                  active ? FontWeight.w600 : FontWeight.normal),
+        ),
+      ),
+    );
+  }
 }
 
 class HuntCard extends StatelessWidget {
