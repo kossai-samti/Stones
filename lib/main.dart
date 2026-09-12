@@ -1062,11 +1062,14 @@ class _HuntState extends State<Hunt> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                    Text('The Hunt',
-                        style: TextStyle(
-                            fontSize: 38, fontStyle: FontStyle.italic)),
-                    Text('Things you are looking for and have found.',
-                        style: TextStyle(color: muted))
+                    Row(children: [
+                      Icon(Icons.explore_outlined, size: 12, color: muted),
+                      const SizedBox(width: 6),
+                      Text('Things you are looking for',
+                          style: TextStyle(fontSize: 13, color: muted)),
+                    ]),
+                    const SizedBox(height: 3),
+                    Text('The Hunt', style: serif(28, weight: FontWeight.w600)),
                   ])),
               IconButton(
                   tooltip: 'Sort hunts',
@@ -2256,16 +2259,20 @@ class Detail extends StatefulWidget {
 class _DetailState extends State<Detail> {
   List<Map<String, dynamic>> memories = [], photos = [];
   bool loading = true;
+  bool noteRevealed = false;
+  late Map<String, dynamic> stone;
+
   @override
   void initState() {
     super.initState();
+    stone = Map.of(widget.stone);
     load();
   }
 
   Future<void> load() async {
     final r = await Future.wait([
-      Api.getAll('memories?stoneId=${widget.stone['id']}'),
-      Api.getAll('stone-photos?stoneId=${widget.stone['id']}')
+      Api.getAll('memories?stoneId=${stone['id']}'),
+      Api.getAll('stone-photos?stoneId=${stone['id']}'),
     ]);
     if (mounted)
       setState(() {
@@ -2275,108 +2282,347 @@ class _DetailState extends State<Detail> {
       });
   }
 
+  Future<void> toggleFavorite() async {
+    final updated = Map<String, dynamic>.of(stone)
+      ..['favorite'] = !(stone['favorite'] == true);
+    await Api.save('stones', updated);
+    await widget.refresh();
+    if (mounted) setState(() => stone = updated);
+  }
+
   @override
-  Widget build(BuildContext c) => Scaffold(
-      appBar: AppBar(title: Text(widget.stone['name']), actions: [
-        IconButton(
-            onPressed: () =>
-                stoneForm(c, widget.refresh, initial: widget.stone),
-            icon: const Icon(Icons.edit)),
-        IconButton(
-            onPressed: () async {
-              await Api.remove('stones', widget.stone['id']);
-              await widget.refresh();
-              if (mounted) Navigator.pop(c);
-            },
-            icon: const Icon(Icons.delete_outline))
-      ]),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(padding: const EdgeInsets.all(20), children: [
-              if (photos.isNotEmpty) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Image.network(
-                    photos.first['imageUrl']?.toString() ?? '',
-                    width: double.infinity,
-                    height: 280,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 280,
-                      color: card,
-                      alignment: Alignment.center,
-                      child: Icon(Icons.broken_image_outlined,
-                          color: muted, size: 46),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-              if (widget.stone['rating'] != null) ...[
-                Text('How much I like it',
-                    style: TextStyle(color: muted)),
-                const SizedBox(height: 4),
-                StarRating(
-                    value: (widget.stone['rating'] as num).toInt(), size: 26),
-                const SizedBox(height: 16),
-              ],
-              ...photos.map((p) => ListTile(
-                  leading: const Icon(Icons.image),
-                  title: Text(p['caption'] ?? p['imageUrl']),
-                  trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () async {
-                        await Api.remove('stone-photos', p['id']);
-                        load();
-                      }))),
-              OutlinedButton.icon(
-                  onPressed: () => recordForm(
-                      c,
-                      'Add photo URL',
-                      'Image URL',
-                      'Caption',
-                      (a, b) => Api.save('stone-photos', {
-                            'stone': {'id': widget.stone['id']},
-                            'imageUrl': a,
-                            'caption': b,
-                            'displayOrder': 0,
-                            'primaryPhoto': false
-                          }).then((_) => load())),
-                  icon: const Icon(Icons.add_link),
-                  label: const Text('Add photo link')),
-              const Heading('Memories'),
-              if (memories.isEmpty)
-                const Empty('No memories yet.')
-              else
-                ...memories.map((m) => Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    decoration: dec(),
-                    child: ListTile(
-                        contentPadding:
-                            const EdgeInsets.fromLTRB(18, 10, 8, 10),
-                        leading: Icon(Icons.auto_stories_outlined,
-                            color: accent),
-                        title: Text(m['title']),
-                        subtitle: m['content']?.toString().isNotEmpty == true
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 5),
-                                child: Text(m['content'],
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis),
+  Widget build(BuildContext c) => ListenableBuilder(
+      listenable: _themeNotifier,
+      builder: (_, __) => Scaffold(
+        backgroundColor: bg,
+        body: SafeArea(
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+                  children: [
+                    // ── Back row ──────────────────────────────────────────
+                    Row(children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(c),
+                        child: Row(children: [
+                          Icon(Icons.arrow_back_ios_new_rounded,
+                              size: 14, color: muted),
+                          const SizedBox(width: 4),
+                          Text('Back to stones',
+                              style: TextStyle(fontSize: 13, color: muted)),
+                        ]),
+                      ),
+                      const Spacer(),
+                      // Edit & delete in back row (unobtrusive)
+                      IconButton(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () =>
+                              stoneForm(c, widget.refresh, initial: stone),
+                          icon: Icon(Icons.edit_outlined,
+                              size: 18, color: muted)),
+                      IconButton(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () async {
+                            final ok =
+                                await confirmStoneRemoval(c, stone);
+                            if (!ok) return;
+                            await Api.remove('stones', stone['id']);
+                            await widget.refresh();
+                            if (mounted) Navigator.pop(c);
+                          },
+                          icon: Icon(Icons.delete_outline,
+                              size: 18, color: muted)),
+                    ]),
+                    const SizedBox(height: 14),
+
+                    // ── Hero photo in HeroFrame ────────────────────────────
+                    HeroFrame(
+                      child: Stack(children: [
+                        // Photo
+                        photos.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius:
+                                    const BorderRadius.all(Radius.circular(21)),
+                                child: Image.network(
+                                  photos.first['imageUrl']?.toString() ?? '',
+                                  width: double.infinity,
+                                  height: 280,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                      height: 280,
+                                      color: imageBg,
+                                      alignment: Alignment.center,
+                                      child: Icon(Icons.broken_image_outlined,
+                                          color: muted, size: 46)),
+                                ),
                               )
-                            : null,
-                        trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () async {
-                              await Api.remove('memories', m['id']);
-                              load();
-                            })))),
-              FilledButton.icon(
-                  onPressed: () => memoryForm(c, widget.stone['id'], load),
-                  icon: const Icon(Icons.auto_stories_outlined),
-                  label: const Text('Add a memory'))
-            ]));
+                            : Container(
+                                height: 280,
+                                color: imageBg,
+                                child: Center(
+                                  child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.diamond_outlined,
+                                            color: accent.withValues(alpha: .4),
+                                            size: 48),
+                                        const SizedBox(height: 10),
+                                        Text('No photo yet',
+                                            style: TextStyle(
+                                                color: muted, fontSize: 13)),
+                                      ]),
+                                ),
+                              ),
+
+                        // Favourite toggle (top-right corner of photo)
+                        Positioned(
+                          top: 12,
+                          right: 12,
+                          child: GestureDetector(
+                            onTap: toggleFavorite,
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: bg.withValues(alpha: .72),
+                                border: Border.all(
+                                    color: accent.withValues(alpha: .3),
+                                    width: 1),
+                              ),
+                              child: Icon(
+                                stone['favorite'] == true
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: stone['favorite'] == true
+                                    ? accent
+                                    : muted,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // ── Name block ────────────────────────────────────────
+                    Text(stone['name'] ?? 'Unnamed stone',
+                        style: serif(30, weight: FontWeight.w600)),
+                    if ((stone['description'] ?? '').toString().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(stone['description'],
+                          style: serif(15,
+                              style: FontStyle.italic, color: muted)),
+                    ],
+                    const SizedBox(height: 20),
+
+                    // ── Data table ────────────────────────────────────────
+                    if ((stone['acquisitionType'] ?? '').toString().isNotEmpty)
+                      _DataRow('Acquired', _acquisitionLabel(stone['acquisitionType'])),
+                    if ((stone['type'] ?? '').toString().isNotEmpty)
+                      _DataRow('Type', stone['type']),
+                    if ((stone['color'] ?? '').toString().isNotEmpty)
+                      _DataRow('Colour', stone['color']),
+
+                    // ── Rating ────────────────────────────────────────────
+                    if (stone['rating'] != null) ...[
+                      const SizedBox(height: 16),
+                      Text('How much I like it',
+                          style: TextStyle(fontSize: 12, color: muted)),
+                      const SizedBox(height: 6),
+                      StarRating(
+                          value: (stone['rating'] as num).toInt(),
+                          size: 26),
+                    ],
+
+                    // ── Why I kept it ─────────────────────────────────────
+                    if ((stone['whyKept'] ?? '').toString().isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      Text('WHY I KEPT IT', style: caps(10)),
+                      const SizedBox(height: 10),
+                      Text(
+                        stone['whyKept'],
+                        style: serif(17,
+                            style: FontStyle.italic,
+                            weight: FontWeight.w500),
+                      ),
+                    ],
+
+                    // ── Memories ─────────────────────────────────────────
+                    const SizedBox(height: 28),
+                    Text('MEMORIES', style: caps(10)),
+                    const SizedBox(height: 12),
+                    if (memories.isEmpty)
+                      Text('No memories yet.',
+                          style: TextStyle(fontSize: 13, color: muted))
+                    else
+                      ...memories.map((m) => Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: card,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                                color: accent.withValues(alpha: .15), width: 1),
+                          ),
+                          child: ListTile(
+                              contentPadding:
+                                  const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                              leading: Icon(Icons.auto_stories_outlined,
+                                  color: accent),
+                              title: Text(m['title'] ?? '',
+                                  style: serif(15, weight: FontWeight.w500)),
+                              subtitle: m['content']?.toString().isNotEmpty ==
+                                      true
+                                  ? Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(m['content'],
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 13, color: muted)),
+                                    )
+                                  : null,
+                              trailing: IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () async {
+                                    await Api.remove('memories', m['id']);
+                                    load();
+                                  })))),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                        onPressed: () => memoryForm(c, stone['id'], load),
+                        icon: const Icon(Icons.auto_stories_outlined, size: 16),
+                        label: const Text('Add a memory')),
+
+                    // ── Photos ────────────────────────────────────────────
+                    const SizedBox(height: 24),
+                    Text('PHOTOS', style: caps(10)),
+                    const SizedBox(height: 10),
+                    ...photos.skip(1).map((p) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(children: [
+                          ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                  p['imageUrl']?.toString() ?? '',
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.cover)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Text(
+                                  p['caption']?.toString().isNotEmpty == true
+                                      ? p['caption']
+                                      : 'No caption',
+                                  style: TextStyle(
+                                      fontSize: 13, color: muted))),
+                          IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              onPressed: () async {
+                                await Api.remove('stone-photos', p['id']);
+                                load();
+                              }),
+                        ]))),
+                    OutlinedButton.icon(
+                        onPressed: () => recordForm(
+                            c,
+                            'Add photo URL',
+                            'Image URL',
+                            'Caption',
+                            (a, b) => Api.save('stone-photos', {
+                                  'stone': {'id': stone['id']},
+                                  'imageUrl': a,
+                                  'caption': b,
+                                  'displayOrder': 0,
+                                  'primaryPhoto': false,
+                                }).then((_) => load())),
+                        icon: const Icon(Icons.add_link, size: 16),
+                        label: const Text('Add photo link')),
+
+                    // ── Hidden note ───────────────────────────────────────
+                    if ((stone['note'] ?? '').toString().isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      GestureDetector(
+                        onTap: () =>
+                            setState(() => noteRevealed = !noteRevealed),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
+                            gradient: LinearGradient(
+                              colors: [
+                                accent.withValues(alpha: .28),
+                                const Color(0xff7B4FB8).withValues(alpha: .22),
+                              ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            border: Border.all(
+                                color: accent.withValues(alpha: .25), width: 1),
+                          ),
+                          child: Row(children: [
+                            Icon(Icons.lock_outline,
+                                size: 14, color: accent),
+                            const SizedBox(width: 8),
+                            Text('A little note is waiting here',
+                                style: TextStyle(
+                                    fontSize: 13, color: accent)),
+                          ]),
+                        ),
+                      ),
+                      if (noteRevealed) ...[
+                        const SizedBox(height: 12),
+                        Text(stone['note'],
+                            style: serif(14,
+                                style: FontStyle.italic, color: muted)),
+                      ],
+                    ],
+                  ],
+                ),
+        ),
+      ));
+
+  String _acquisitionLabel(dynamic type) {
+    switch (type?.toString()) {
+      case 'FOUND':
+        return 'Found';
+      case 'BOUGHT':
+        return 'Bought';
+      case 'GIFTED':
+        return 'Gifted';
+      default:
+        return type?.toString() ?? '';
+    }
+  }
 }
+
+class _DataRow extends StatelessWidget {
+  const _DataRow(this.label, this.value);
+  final String label, value;
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(children: [
+            SizedBox(
+                width: 90,
+                child: Text(label,
+                    style: TextStyle(fontSize: 13, color: muted))),
+            Expanded(
+                child: Text(value,
+                    style: const TextStyle(fontSize: 14))),
+          ]),
+        ),
+        Divider(height: 1, color: accent.withValues(alpha: .12)),
+      ]);
+}
+
 
 class StoneWizard extends StatefulWidget {
   const StoneWizard({super.key, required this.onSaved});
