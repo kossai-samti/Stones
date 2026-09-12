@@ -709,7 +709,7 @@ class _HuntTeaser extends StatelessWidget {
         FacetedSwatch(
             width: 64,
             height: 72,
-            imageUrl: hunt['imageUrl'] as String?),
+            imageUrl: hunt['referenceImageUrl'] as String?),
         const SizedBox(width: 14),
         Expanded(
             child: Column(
@@ -1042,21 +1042,16 @@ class _HuntState extends State<Hunt> {
         list.sort(
             (a, b) => (b['createdAt'] ?? '').compareTo(a['createdAt'] ?? ''));
     }
-    final filtered = list
-        .where((item) =>
-            (filter == HuntFilter.all ||
-                    (filter == HuntFilter.found
-                        ? item['status'] == 'FOUND'
-                        : item['status'] != 'FOUND')) &&
-                (item['name'] ?? '')
-                    .toString()
-                    .toLowerCase()
-                    .contains(q.toLowerCase()) ||
-            (item['description'] ?? '')
-                .toString()
-                .toLowerCase()
-                .contains(q.toLowerCase()))
-        .toList();
+    final filtered = list.where((item) {
+      final matchesFilter = filter == HuntFilter.all ||
+          (filter == HuntFilter.found
+              ? item['status'] == 'FOUND'
+              : item['status'] != 'FOUND');
+      final matchesSearch = q.isEmpty ||
+          (item['name'] ?? '').toString().toLowerCase().contains(q.toLowerCase()) ||
+          (item['description'] ?? '').toString().toLowerCase().contains(q.toLowerCase());
+      return matchesFilter && matchesSearch;
+    }).toList();
     return reverse ? filtered.reversed.toList() : filtered;
   }
 
@@ -2280,12 +2275,33 @@ class _HuntDetailState extends State<HuntDetail> {
               Text(hunt['name'] ?? '',
                   style: const TextStyle(
                       fontSize: 32, fontStyle: FontStyle.italic)),
-              const SizedBox(height: 18),
-              AspectRatio(
-                  aspectRatio: 1.25,
-                  child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: HuntImage(hunt['referenceImageUrl']))),
+              const SizedBox(height: 20),
+              // Full-width reference image
+              if ((hunt['referenceImageUrl'] ?? '').toString().isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Image.network(
+                    hunt['referenceImageUrl'],
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                        height: 200,
+                        color: imageBg,
+                        child: Icon(Icons.broken_image_outlined,
+                            color: muted, size: 40)),
+                  ),
+                )
+              else
+                Container(
+                  height: 180,
+                  decoration: BoxDecoration(
+                    color: imageBg,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Center(
+                      child: Icon(Icons.search,
+                          color: muted, size: 48)),
+                ),
               const SizedBox(height: 20),
               Text(
                   hunt['description']?.toString().isNotEmpty == true
@@ -2672,12 +2688,12 @@ class _DetailState extends State<Detail> {
                     const SizedBox(height: 20),
 
                     // ── Data table ────────────────────────────────────────
+                    if ((stone['acquisitionDate'] ?? '').toString().isNotEmpty)
+                      _DataRow('Acquired', stone['acquisitionDate']),
                     if ((stone['acquisitionType'] ?? '').toString().isNotEmpty)
-                      _DataRow('Acquired', _acquisitionLabel(stone['acquisitionType'])),
-                    if ((stone['type'] ?? '').toString().isNotEmpty)
-                      _DataRow('Type', stone['type']),
-                    if ((stone['color'] ?? '').toString().isNotEmpty)
-                      _DataRow('Colour', stone['color']),
+                      _DataRow('How', _acquisitionLabel(stone['acquisitionType'])),
+                    if ((stone['place'] ?? '').toString().isNotEmpty)
+                      _DataRow('Place', stone['place']),
 
                     // ── Rating ────────────────────────────────────────────
                     if (stone['rating'] != null) ...[
@@ -2779,20 +2795,30 @@ class _DetailState extends State<Detail> {
                               }),
                         ]))),
                     OutlinedButton.icon(
-                        onPressed: () => recordForm(
-                            c,
-                            'Add photo URL',
-                            'Image URL',
-                            'Caption',
-                            (a, b) => Api.save('stone-photos', {
-                                  'stone': {'id': stone['id']},
-                                  'imageUrl': a,
-                                  'caption': b,
-                                  'displayOrder': 0,
-                                  'primaryPhoto': false,
-                                }).then((_) => load())),
-                        icon: const Icon(Icons.add_link, size: 16),
-                        label: const Text('Add photo link')),
+                        onPressed: () async {
+                          final picker = ImagePicker();
+                          final file = await picker.pickImage(
+                              source: ImageSource.gallery,
+                              imageQuality: 82,
+                              maxWidth: 1920,
+                              maxHeight: 1920);
+                          if (file == null) return;
+                          try {
+                            final url = await Api.upload(file);
+                            await Api.save('stone-photos', {
+                              'stone': {'id': stone['id']},
+                              'imageUrl': url,
+                              'caption': '',
+                              'displayOrder': photos.length,
+                              'primaryPhoto': false,
+                            });
+                            load();
+                          } catch (e) {
+                            if (mounted) notice(c, e);
+                          }
+                        },
+                        icon: const Icon(Icons.add_a_photo_outlined, size: 16),
+                        label: const Text('Add another photo')),
 
                     // ── Hidden note ───────────────────────────────────────
                     if ((stone['note'] ?? '').toString().isNotEmpty) ...[
@@ -2886,7 +2912,9 @@ class _StoneWizardState extends State<StoneWizard> {
   final picker = ImagePicker(),
       name = TextEditingController(),
       description = TextEditingController(),
-      why = TextEditingController();
+      why = TextEditingController(),
+      place = TextEditingController(),
+      acquiredDate = TextEditingController();
   int step = 0;
   int? rating;
   XFile? photo;
@@ -2930,6 +2958,8 @@ class _StoneWizardState extends State<StoneWizard> {
         'description': description.text.trim(),
         'whyKept': why.text.trim(),
         'acquisitionType': kind,
+        'acquisitionDate': acquiredDate.text.trim(),
+        'place': place.text.trim(),
         'favorite': favorite,
         'rating': rating
       };
@@ -3051,21 +3081,23 @@ class _StoneWizardState extends State<StoneWizard> {
         TextField(
             controller: description,
             textCapitalization: TextCapitalization.sentences,
-            maxLines: 5,
+            maxLines: 4,
             decoration: const InputDecoration(
                 labelText: 'Description',
-                hintText: 'Its colour, texture, or whatever you notice.'))
+                hintText: 'Its colour, texture, or whatever you notice.')),
+        const SizedBox(height: 16),
+        TextField(
+            controller: why,
+            textCapitalization: TextCapitalization.sentences,
+            maxLines: 3,
+            decoration: const InputDecoration(
+                labelText: 'Why did you keep it?')),
       ]);
+    // Step 3 — acquisition details + rating
     return ListView(children: [
-      const Text('One last thing.',
+      const Text('Where did it come from?',
           style: TextStyle(fontSize: 29, fontStyle: FontStyle.italic)),
       const SizedBox(height: 22),
-      TextField(
-          controller: why,
-          textCapitalization: TextCapitalization.sentences,
-          maxLines: 4,
-          decoration: const InputDecoration(labelText: 'Why did you keep it?')),
-      const SizedBox(height: 18),
       DropdownButtonFormField(
           value: kind,
           decoration:
@@ -3074,6 +3106,20 @@ class _StoneWizardState extends State<StoneWizard> {
               .map((e) => DropdownMenuItem(value: e, child: Text(e)))
               .toList(),
           onChanged: (v) => setState(() => kind = v!)),
+      const SizedBox(height: 14),
+      TextField(
+          controller: acquiredDate,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+              labelText: 'When? (e.g. June 2024)',
+              hintText: 'Roughly when you got it')),
+      const SizedBox(height: 14),
+      TextField(
+          controller: place,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+              labelText: 'Where?',
+              hintText: 'A beach, a market, a forest…')),
       SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Make it a favorite'),
@@ -3097,17 +3143,19 @@ void stoneForm(BuildContext c, Future<void> Function() done,
         c, MaterialPageRoute(builder: (_) => StoneWizard(onSaved: done)));
     return;
   }
-  final n = TextEditingController(text: initial?['name'] ?? ''),
-      d = TextEditingController(text: initial?['description'] ?? ''),
-      w = TextEditingController(text: initial?['whyKept'] ?? '');
-  bool favorite = initial?['favorite'] == true;
-  int? rating = (initial?['rating'] as num?)?.toInt();
-  String kind = initial?['acquisitionType'] ?? 'FOUND';
+  final n = TextEditingController(text: initial['name'] ?? ''),
+      d = TextEditingController(text: initial['description'] ?? ''),
+      w = TextEditingController(text: initial['whyKept'] ?? ''),
+      pl = TextEditingController(text: initial['place'] ?? ''),
+      ad = TextEditingController(text: initial['acquisitionDate'] ?? '');
+  bool favorite = initial['favorite'] == true;
+  int? rating = (initial['rating'] as num?)?.toInt();
+  String kind = initial['acquisitionType'] ?? 'FOUND';
   showDialog(
       context: c,
       builder: (x) => StatefulBuilder(
           builder: (x, set) => AlertDialog(
-                  title: Text(initial == null ? 'New stone' : 'Edit stone'),
+                  title: const Text('Edit stone'),
                   content: SingleChildScrollView(
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                     TextField(
@@ -3127,7 +3175,17 @@ void stoneForm(BuildContext c, Future<void> Function() done,
                             .map((e) =>
                                 DropdownMenuItem(value: e, child: Text(e)))
                             .toList(),
-                        onChanged: (v) => set(() => kind = v!)),
+                            onChanged: (v) => set(() => kind = v!)),
+                    TextField(
+                        controller: ad,
+                        decoration: const InputDecoration(
+                            labelText: 'When?',
+                            hintText: 'e.g. June 2024')),
+                    TextField(
+                        controller: pl,
+                        decoration: const InputDecoration(
+                            labelText: 'Where?',
+                            hintText: 'A beach, a market…')),
                     SwitchListTile(
                         title: const Text('Favorite'),
                         value: favorite,
@@ -3155,10 +3213,12 @@ void stoneForm(BuildContext c, Future<void> Function() done,
                                   'description': d.text.trim(),
                                   'whyKept': w.text.trim(),
                                   'acquisitionType': kind,
+                                  'acquisitionDate': ad.text.trim(),
+                                  'place': pl.text.trim(),
                                   'favorite': favorite,
                                   'rating': rating
                                 },
-                                id: initial?['id']);
+                                id: initial['id']);
                             await done();
                             if (x.mounted) Navigator.pop(x);
                           } catch (e) {
