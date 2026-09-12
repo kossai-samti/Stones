@@ -2547,13 +2547,21 @@ class _DetailState extends State<Detail> {
     final r = await Future.wait([
       Api.getAll('memories?stoneId=${stone['id']}'),
       Api.getAll('stone-photos?stoneId=${stone['id']}'),
+      Api.getAll('stones'),
     ]);
-    if (mounted)
+    if (mounted) {
+      final allStones = r[2] as List<Map<String, dynamic>>;
+      final current = allStones.firstWhere(
+        (s) => s['id'] == stone['id'],
+        orElse: () => stone,
+      );
       setState(() {
+        stone = Map<String, dynamic>.of(current);
         memories = r[0];
         photos = r[1];
         loading = false;
       });
+    }
   }
 
   Future<void> toggleFavorite() async {
@@ -2594,8 +2602,10 @@ class _DetailState extends State<Detail> {
                       IconButton(
                           padding: EdgeInsets.zero,
                           visualDensity: VisualDensity.compact,
-                          onPressed: () =>
-                              stoneForm(c, widget.refresh, initial: stone),
+                          onPressed: () async {
+                            await stoneForm(c, widget.refresh, initial: stone);
+                            await load();
+                          },
                           icon: Icon(Icons.edit_outlined,
                               size: 18, color: muted)),
                       IconButton(
@@ -2697,12 +2707,37 @@ class _DetailState extends State<Detail> {
                     const SizedBox(height: 20),
 
                     // ── Data table ────────────────────────────────────────
-                    if ((stone['acquisitionDate'] ?? '').toString().isNotEmpty)
-                      _DataRow('Acquired', stone['acquisitionDate']),
-                    if ((stone['acquisitionType'] ?? '').toString().isNotEmpty)
-                      _DataRow('How', _acquisitionLabel(stone['acquisitionType'])),
-                    if ((stone['place'] ?? '').toString().isNotEmpty)
-                      _DataRow('Place', stone['place']),
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                            color: accent.withValues(alpha: .18), width: 1),
+                      ),
+                      child: Column(
+                        children: [
+                          _DataRow(
+                            'Acquired',
+                            (stone['acquisitionDate'] ?? '').toString().isNotEmpty
+                                ? stone['acquisitionDate'].toString()
+                                : 'Not specified',
+                            isFirst: true,
+                          ),
+                          _DataRow(
+                            'How',
+                            _acquisitionLabel(stone['acquisitionType']),
+                          ),
+                          _DataRow(
+                            'Place',
+                            (stone['place'] ?? '').toString().isNotEmpty
+                                ? stone['place'].toString()
+                                : 'Not specified',
+                            isLast: true,
+                          ),
+                        ],
+                      ),
+                    ),
 
                     // ── Rating ────────────────────────────────────────────
                     if (stone['rating'] != null) ...[
@@ -2875,26 +2910,33 @@ class _DetailState extends State<Detail> {
       ));
 
   String _acquisitionLabel(dynamic type) {
-    switch (type?.toString()) {
+    final str = type?.toString().toUpperCase() ?? '';
+    switch (str) {
       case 'FOUND':
         return 'Found';
       case 'BOUGHT':
         return 'Bought';
+      case 'GIFT':
       case 'GIFTED':
-        return 'Gifted';
+        return 'Gift';
+      case 'OTHER':
+        return 'Other';
       default:
-        return type?.toString() ?? '';
+        return str.isNotEmpty ? str : 'Not specified';
     }
   }
 }
 
 class _DataRow extends StatelessWidget {
-  const _DataRow(this.label, this.value);
+  const _DataRow(this.label, this.value,
+      {this.isFirst = false, this.isLast = false});
   final String label, value;
+  final bool isFirst, isLast;
+
   @override
   Widget build(BuildContext context) => Column(children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(children: [
             SizedBox(
                 width: 90,
@@ -2902,10 +2944,20 @@ class _DataRow extends StatelessWidget {
                     style: TextStyle(fontSize: 13, color: muted))),
             Expanded(
                 child: Text(value,
-                    style: const TextStyle(fontSize: 14))),
+                    style: TextStyle(
+                        fontSize: 14,
+                        color: value == 'Not specified' ? muted : null,
+                        fontStyle: value == 'Not specified'
+                            ? FontStyle.italic
+                            : FontStyle.normal))),
           ]),
         ),
-        Divider(height: 1, color: accent.withValues(alpha: .12)),
+        if (!isLast)
+          Divider(
+              height: 1,
+              color: accent.withValues(alpha: .12),
+              indent: 16,
+              endIndent: 16),
       ]);
 }
 
@@ -3159,7 +3211,9 @@ void stoneForm(BuildContext c, Future<void> Function() done,
       ad = TextEditingController(text: initial['acquisitionDate'] ?? '');
   bool favorite = initial['favorite'] == true;
   int? rating = (initial['rating'] as num?)?.toInt();
-  String kind = initial['acquisitionType'] ?? 'FOUND';
+  String rawKind = (initial['acquisitionType'] ?? 'FOUND').toString().toUpperCase();
+  if (rawKind == 'GIFTED') rawKind = 'GIFT';
+  String kind = ['FOUND', 'BOUGHT', 'GIFT', 'OTHER'].contains(rawKind) ? rawKind : 'FOUND';
   showDialog(
       context: c,
       builder: (x) => StatefulBuilder(
