@@ -637,7 +637,7 @@ class Home extends StatelessWidget {
                   const OrnamentDivider(),
                   Text('THE HUNT', style: caps(10)),
                   const SizedBox(height: 12),
-                  _HuntTeaser(topHunt, photos, refresh),
+                  _HuntTeaser(topHunt, hunts, photos, refresh),
                 ],
               ],
             ),
@@ -690,42 +690,49 @@ class _Dot extends StatelessWidget {
 }
 
 class _HuntTeaser extends StatelessWidget {
-  const _HuntTeaser(this.hunt, this.photos, this.refresh);
+  const _HuntTeaser(this.hunt, this.stones, this.photos, this.refresh);
   final Map<String, dynamic> hunt;
+  final List<Map<String, dynamic>> stones;
   final List<Map<String, dynamic>> photos;
   final Future<void> Function() refresh;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: card,
-        borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: accent.withValues(alpha: .18), width: 1),
+    return GestureDetector(
+      onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => HuntDetail(hunt, stones, refresh))),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: card,
+          borderRadius: BorderRadius.circular(16),
+          border:
+              Border.all(color: accent.withValues(alpha: .18), width: 1),
+        ),
+        child: Row(children: [
+          FacetedSwatch(
+              width: 64,
+              height: 72,
+              imageUrl: hunt['referenceImageUrl'] as String?),
+          const SizedBox(width: 14),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(hunt['name'] ?? 'Hunt item',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: serif(16, weight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('still searching',
+                    style:
+                        TextStyle(fontSize: 12, color: muted)),
+              ])),
+          Icon(Icons.chevron_right, color: muted, size: 18),
+        ]),
       ),
-      child: Row(children: [
-        FacetedSwatch(
-            width: 64,
-            height: 72,
-            imageUrl: hunt['referenceImageUrl'] as String?),
-        const SizedBox(width: 14),
-        Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Text(hunt['name'] ?? 'Hunt item',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: serif(16, weight: FontWeight.w600)),
-              const SizedBox(height: 4),
-              Text('still searching',
-                  style:
-                      TextStyle(fontSize: 12, color: muted)),
-            ])),
-        Icon(Icons.chevron_right, color: muted, size: 18),
-      ]),
     );
   }
 }
@@ -2550,9 +2557,11 @@ class _DetailState extends State<Detail> {
   }
 
   Future<void> toggleFavorite() async {
+    final newVal = !(stone['favorite'] == true);
     final updated = Map<String, dynamic>.of(stone)
-      ..['favorite'] = !(stone['favorite'] == true);
-    await Api.save('stones', updated);
+      ..['favorite'] = newVal;
+    // Must pass id: explicitly — otherwise Api.save does POST (create) not PUT (update)
+    await Api.save('stones', updated, id: stone['id'] as int?);
     await widget.refresh();
     if (mounted) setState(() => stone = updated);
   }
