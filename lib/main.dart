@@ -6,8 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() => runApp(const LithaApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await _loadPrefs();
+  runApp(const LithaApp());
+}
 
 class Api {
   static final url = _baseUrl();
@@ -118,12 +124,51 @@ const _botanicalTheme = LithaTheme(
 const _themes = [_gothicTheme, _romanticTheme, _botanicalTheme];
 final _themeNotifier = ValueNotifier<LithaTheme>(_gothicTheme);
 
+final _nameNotifier = ValueNotifier<String>('Alisa');
+
+Future<void> _loadPrefs() async {
+  final prefs = await SharedPreferences.getInstance();
+  _nameNotifier.value = prefs.getString('user_name') ?? 'Alisa';
+  _themeNotifier.value = _themes[
+    (prefs.getInt('theme_index') ?? 0).clamp(0, _themes.length - 1)];
+}
+
+Future<void> _saveName(String name) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('user_name', name);
+}
+
+Future<void> _saveTheme(LithaTheme t) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setInt('theme_index', _themes.indexOf(t));
+}
+
 // Shortcut getters — read from the active theme. NOT const.
 Color get bg => _themeNotifier.value.bg;
 Color get card => _themeNotifier.value.card;
 Color get accent => _themeNotifier.value.accent;
 Color get muted => _themeNotifier.value.muted;
 Color get imageBg => _themeNotifier.value.imageBg;
+
+// ── Typography helpers ────────────────────────────────────────────────────────
+// Display serif — Cormorant Garamond
+TextStyle serif(double size,
+    {FontWeight weight = FontWeight.w400,
+    FontStyle style = FontStyle.normal,
+    Color? color}) =>
+    GoogleFonts.cormorantGaramond(
+        fontSize: size,
+        fontWeight: weight,
+        fontStyle: style,
+        color: color);
+
+// Tracked caps — Cinzel
+TextStyle caps(double size, {Color? color}) =>
+    GoogleFonts.cinzel(
+        fontSize: size,
+        letterSpacing: 1.8,
+        fontWeight: FontWeight.w500,
+        color: color ?? accent);
 
 // Temporary preview delay for the loading screen. Set to Duration.zero to remove it.
 const loadingScreenPreviewDuration = Duration(seconds: 5);
@@ -238,6 +283,8 @@ class _ShellState extends State<Shell> {
         floatingActionButton: isLoading
             ? null
             : FloatingActionButton(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
                 onPressed: () {
                   if (tab == 1) {
                     stoneForm(c, refresh);
@@ -247,7 +294,27 @@ class _ShellState extends State<Shell> {
                     chooseAdd(c);
                   }
                 },
-                child: const Icon(Icons.add)),
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [accent, const Color(0xff7B4FB8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    border: Border.all(
+                        color: accent.withValues(alpha: .35), width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                          color: accent.withValues(alpha: .40),
+                          blurRadius: 18,
+                          spreadRadius: 2),
+                    ],
+                  ),
+                  child: const Icon(Icons.add, color: Colors.white),
+                )),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
         bottomNavigationBar: isLoading
             ? null
@@ -293,37 +360,349 @@ class Home extends StatelessWidget {
   const Home(this.stones, this.hunts, this.photos, this.refresh, {super.key});
   final List<Map<String, dynamic>> stones, hunts, photos;
   final Future<void> Function() refresh;
+
+  Map<String, dynamic>? get _heroStone =>
+      stones.isNotEmpty ? stones.last : null;
+
   @override
-  Widget build(BuildContext c) => SafeArea(
+  Widget build(BuildContext context) {
+    final hero = _heroStone;
+    final heroUrl = hero != null ? stonePhotoUrl(hero, photos) : null;
+    final recentFour = stones.reversed.take(6).toList();
+    final topHunt = hunts
+        .where((h) => h['status'] == 'SEARCHING')
+        .toList()
+        .firstOrNull;
+
+    return SafeArea(
       child: RefreshIndicator(
-          onRefresh: refresh,
-          child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 110),
+        onRefresh: refresh,
+        child: Stack(
+          children: [
+            // Radial glow from top
+            Positioned(
+              top: -80,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  width: 340,
+                  height: 340,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0x298B5FBF),
+                        Colors.transparent,
+                      ],
+                      stops: const [0, .6],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            ListView(
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 120),
               children: [
-                const Text('My little museum',
-                    style:
-                        TextStyle(fontSize: 32, fontStyle: FontStyle.italic)),
-                const SizedBox(height: 6),
-                Text('Every little thing worth keeping.',
-                    style: TextStyle(color: muted)),
-                const SizedBox(height: 26),
-                Stats(stones.length, hunts.length),
-                const SizedBox(height: 26),
-                const Heading('Recently added'),
-                if (stones.isEmpty)
+                // ── Header ──────────────────────────────────────────────────
+                ValueListenableBuilder<String>(
+                  valueListenable: _nameNotifier,
+                  builder: (_, name, __) => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text('☽ ',
+                              style: TextStyle(
+                                  fontSize: 12, color: muted)),
+                          Text(_greeting(),
+                              style:
+                                  TextStyle(fontSize: 13, color: muted)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text("$name's cabinet",
+                          style: serif(27,
+                              weight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                // ── Hero card ───────────────────────────────────────────────
+                if (hero != null)
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => Detail(hero, refresh))),
+                    child: HeroFrame(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Photo
+                          ClipRRect(
+                            borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(21),
+                                topRight: Radius.circular(21)),
+                            child: heroUrl != null
+                                ? Image.network(
+                                    heroUrl,
+                                    width: double.infinity,
+                                    height: 240,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        Container(
+                                            width: double.infinity,
+                                            height: 240,
+                                            color: imageBg,
+                                            child: Center(
+                                                child: Icon(
+                                                    Icons.diamond_outlined,
+                                                    color: accent
+                                                        .withValues(alpha: .4),
+                                                    size: 56))),
+                                  )
+                                : Container(
+                                    width: double.infinity,
+                                    height: 240,
+                                    color: imageBg,
+                                    child: Center(
+                                        child: Icon(
+                                            Icons.diamond_outlined,
+                                            color:
+                                                accent.withValues(alpha: .4),
+                                            size: 56))),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                    hero['name'] ?? 'Unnamed stone',
+                                    style: serif(19,
+                                        weight: FontWeight.w600)),
+                                if ((hero['whyKept'] ?? '')
+                                    .toString()
+                                    .isNotEmpty) ...[  
+                                  const SizedBox(height: 4),
+                                  Text(
+                                      hero['whyKept'],
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: serif(13,
+                                          style: FontStyle.italic,
+                                          color: muted)),
+                                ],
+                                const SizedBox(height: 10),
+                                Text('View this stone →',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: accent,
+                                        letterSpacing: .3)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    height: 160,
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                            color: accent.withValues(alpha: .18), width: 1)),
+                    child: Center(
+                        child: Column(mainAxisSize: MainAxisSize.min,
+                            children: [
+                          Icon(Icons.diamond_outlined,
+                              color: accent.withValues(alpha: .4), size: 36),
+                          const SizedBox(height: 8),
+                          Text('Add your first stone',
+                              style: TextStyle(color: muted)),
+                        ])),
+                  ),
+                const SizedBox(height: 16),
+
+                // ── Stats row ───────────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: card,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                        color: accent.withValues(alpha: .18), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _StatCell('${stones.length}', 'stones'),
+                      _Dot(),
+                      _StatCell('${hunts.length}', 'hunts'),
+                      _Dot(),
+                      _StatCell(
+                          '${photos.length}', 'photos'),
+                      _Dot(),
+                      _StatCell(
+                          '${_yearsActive(stones)}', 'years'),
+                    ],
+                  ),
+                ),
+
+                // ── Ornament divider ────────────────────────────────────────
+                const OrnamentDivider(),
+
+                // ── Recently added label ────────────────────────────────────
+                Text('RECENTLY ADDED', style: caps(10)),
+                const SizedBox(height: 14),
+
+                // ── Horizontal swatch row ───────────────────────────────────
+                if (recentFour.isEmpty)
                   const Empty('Add your first stone.')
                 else
-                  RecentStones(
-                      stones.reversed.take(4).toList(), photos, refresh),
-                const Heading('The Hunt'),
-                if (hunts.isEmpty)
-                  const Empty('Add something you hope to find.')
-                else
-                  ...hunts
-                      .where((h) => h['status'] == 'SEARCHING')
-                      .take(2)
-                      .map((h) => HuntTile(h, stones, refresh))
-              ])));
+                  SizedBox(
+                    height: 168,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: recentFour.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(width: 12),
+                      itemBuilder: (_, i) {
+                        final s = recentFour[i];
+                        final url = stonePhotoUrl(s, photos);
+                        return GestureDetector(
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => Detail(s, refresh))),
+                          onLongPress: () =>
+                              showStonePreview(context, s, url),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FacetedSwatch(
+                                  width: 110,
+                                  height: 130,
+                                  imageUrl: url),
+                              const SizedBox(height: 6),
+                              SizedBox(
+                                width: 110,
+                                child: Text(
+                                    s['name'] ?? '',
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: muted)),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                // ── Hunt teaser ─────────────────────────────────────────────
+                if (topHunt != null) ...[
+                  const OrnamentDivider(),
+                  Text('THE HUNT', style: caps(10)),
+                  const SizedBox(height: 12),
+                  _HuntTeaser(topHunt, photos, refresh),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 5) return 'Good night,';
+    if (h < 12) return 'Good morning,';
+    if (h < 18) return 'Good afternoon,';
+    return 'Good evening,';
+  }
+
+  int _yearsActive(List<Map<String, dynamic>> s) {
+    if (s.isEmpty) return 0;
+    // fallback: just return 1 as a warm default
+    return 1;
+  }
+}
+
+class _StatCell extends StatelessWidget {
+  const _StatCell(this.value, this.label);
+  final String value, label;
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(value, style: serif(26, weight: FontWeight.w600, color: accent)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(fontSize: 10, color: muted)),
+        ],
+      );
+}
+
+class _Dot extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 3,
+        height: 3,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: accent.withValues(alpha: .3),
+        ),
+      );
+}
+
+class _HuntTeaser extends StatelessWidget {
+  const _HuntTeaser(this.hunt, this.photos, this.refresh);
+  final Map<String, dynamic> hunt;
+  final List<Map<String, dynamic>> photos;
+  final Future<void> Function() refresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: card,
+        borderRadius: BorderRadius.circular(16),
+        border:
+            Border.all(color: accent.withValues(alpha: .18), width: 1),
+      ),
+      child: Row(children: [
+        FacetedSwatch(
+            width: 64,
+            height: 72,
+            imageUrl: hunt['imageUrl'] as String?),
+        const SizedBox(width: 14),
+        Expanded(
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              Text(hunt['name'] ?? 'Hunt item',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: serif(16, weight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text('still searching',
+                  style:
+                      TextStyle(fontSize: 12, color: muted)),
+            ])),
+        Icon(Icons.chevron_right, color: muted, size: 18),
+      ]),
+    );
+  }
 }
 
 class Collection extends StatefulWidget {
@@ -335,115 +714,279 @@ class Collection extends StatefulWidget {
   State<Collection> createState() => _CollectionState();
 }
 
+enum _Filter { all, favorites, recent, withMemories }
+
 class _CollectionState extends State<Collection> {
   String q = '';
-  bool fav = false;
-  bool showGrid = false;
+  _Filter filter = _Filter.all;
+
+  List<Map<String, dynamic>> get _filtered {
+    var list = widget.stones.where((s) {
+      return (s['name'] ?? '')
+          .toString()
+          .toLowerCase()
+          .contains(q.toLowerCase());
+    }).toList();
+    switch (filter) {
+      case _Filter.favorites:
+        list = list.where((s) => s['favorite'] == true).toList();
+      case _Filter.recent:
+        list = list.reversed.take(4).toList();
+      case _Filter.withMemories:
+        // stones with memories — we don't have memory count directly,
+        // so show all for now (data isn't available at list level)
+        break;
+      case _Filter.all:
+        break;
+    }
+    return list;
+  }
+
   @override
-  Widget build(BuildContext c) {
-    final list = widget.stones
-        .where((s) =>
-            (!fav || s['favorite'] == true) &&
-            (s['name'] ?? '')
-                .toString()
-                .toLowerCase()
-                .contains(q.toLowerCase()))
-        .toList();
+  Widget build(BuildContext context) {
+    final list = _filtered;
     return SafeArea(
-        child: RefreshIndicator(
-            onRefresh: widget.refresh,
-            child: Column(children: [
-              Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 24, 12, 0),
-                  child: Row(children: [
-                    const Expanded(
-                        child: Text('The collection',
-                            style: TextStyle(
-                                fontSize: 34, fontStyle: FontStyle.italic))),
-                    IconButton(
-                        tooltip: 'Grid view',
-                        isSelected: showGrid,
-                        onPressed: () => setState(() => showGrid = true),
-                        icon: const Icon(Icons.grid_view_rounded)),
-                    IconButton(
-                        tooltip: 'List view',
-                        isSelected: !showGrid,
-                        onPressed: () => setState(() => showGrid = false),
-                        icon: const Icon(Icons.view_list_rounded))
-                  ])),
-              Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: TextField(
-                      onChanged: (v) => setState(() => q = v),
-                      decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          hintText: 'Search stones'))),
-              Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Favorites only'),
-                      value: fav,
-                      onChanged: (v) => setState(() => fav = v))),
-              Expanded(
-                  child: list.isEmpty
-                      ? ListView(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                          children: const [Empty('No stones here yet.')])
-                      : showGrid
-                          ? GridView.builder(
-                              padding:
-                                  const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      crossAxisSpacing: 12,
-                                      mainAxisSpacing: 12,
-                                      childAspectRatio: .72),
-                              itemCount: list.length,
-                              itemBuilder: (_, i) => StoneCard(
-                                  list[i], widget.photos, widget.refresh,
-                                  previewOnLongPress: true))
-                          : ListView.builder(
-                              padding:
-                                  const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                              itemCount: list.length,
-                              itemBuilder: (_, i) {
-                                final stone = list[i];
-                                return Dismissible(
-                                  key: ValueKey('stone-${stone['id']}'),
-                                  direction: DismissDirection.endToStart,
-                                  background: Container(
-                                    alignment: Alignment.centerRight,
-                                    padding: const EdgeInsets.only(right: 24),
-                                    decoration: BoxDecoration(
-                                      color: Colors.redAccent,
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: const Icon(Icons.delete_outline),
-                                  ),
-                                  confirmDismiss: (_) async {
-                                    if (!await confirmStoneRemoval(c, stone)) {
-                                      return false;
-                                    }
-                                    try {
-                                      await Api.remove('stones', stone['id']);
-                                      await widget.refresh();
-                                      return true;
-                                    } catch (e) {
-                                      if (c.mounted) notice(c, e);
-                                      return false;
-                                    }
-                                  },
-                                  child: StoneTile(
-                                    stone,
-                                    widget.refresh,
-                                    photoUrl:
-                                        stonePhotoUrl(stone, widget.photos),
-                                  ),
-                                );
-                              }))
-            ])));
+      child: RefreshIndicator(
+        onRefresh: widget.refresh,
+        child: Stack(children: [
+          // Radial glow
+          Positioned(
+            top: -60,
+            right: -60,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [
+                  const Color(0x1A8B5FBF),
+                  Colors.transparent,
+                ], stops: const [0, .6]),
+              ),
+            ),
+          ),
+          Column(children: [
+            // ── Header ────────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.hexagon_outlined,
+                        size: 12, color: muted),
+                    const SizedBox(width: 6),
+                    Text('Specimens kept',
+                        style: TextStyle(fontSize: 13, color: muted)),
+                  ]),
+                  const SizedBox(height: 3),
+                  Text('Stones', style: serif(28, weight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Search ────────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TextField(
+                onChanged: (v) => setState(() => q = v),
+                style: TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  prefixIcon: Icon(Icons.search, size: 18),
+                  hintText: 'Search your stones',
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 10),
+                  filled: true,
+                  fillColor: _themeNotifier.value.card,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide(
+                        color: accent.withValues(alpha: .2), width: 1),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide(
+                        color: accent.withValues(alpha: .2), width: 1),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // ── Filter chips ──────────────────────────────────────────────
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  _Chip('All', _Filter.all, filter,
+                      () => setState(() => filter = _Filter.all)),
+                  const SizedBox(width: 8),
+                  _Chip('Favorites', _Filter.favorites, filter,
+                      () => setState(() => filter = _Filter.favorites)),
+                  const SizedBox(width: 8),
+                  _Chip('Recently added', _Filter.recent, filter,
+                      () => setState(() => filter = _Filter.recent)),
+                  const SizedBox(width: 8),
+                  _Chip('With memories', _Filter.withMemories, filter,
+                      () => setState(() => filter = _Filter.withMemories)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── Masonry grid ──────────────────────────────────────────────
+            Expanded(
+              child: list.isEmpty
+                  ? const Center(child: Empty('No stones here yet.'))
+                  : RefreshIndicator(
+                      onRefresh: widget.refresh,
+                      child: SingleChildScrollView(
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 0, 16, 110),
+                        child: _MasonryGrid(
+                            list, widget.photos, widget.refresh),
+                      ),
+                    ),
+            ),
+          ]),
+        ]),
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip(this.label, this.value, this.current, this.onTap);
+  final String label;
+  final _Filter value, current;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = value == current;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+              color: active ? accent : accent.withValues(alpha: .3),
+              width: 1),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+              fontSize: 12,
+              color: active ? card : muted,
+              fontWeight:
+                  active ? FontWeight.w600 : FontWeight.normal),
+        ),
+      ),
+    );
+  }
+}
+
+class _MasonryGrid extends StatelessWidget {
+  const _MasonryGrid(this.stones, this.photos, this.refresh);
+  final List<Map<String, dynamic>> stones;
+  final List<Map<String, dynamic>> photos;
+  final Future<void> Function() refresh;
+
+  double _cardHeight(Map<String, dynamic> stone) {
+    // Stable pseudo-random height seeded from stone id
+    final seed = (stone['id'] as int? ?? 0);
+    final rng = math.Random(seed);
+    return 148 + rng.nextDouble() * 60; // 148..208
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Split into two columns alternately
+    final left = <Map<String, dynamic>>[];
+    final right = <Map<String, dynamic>>[];
+    for (var i = 0; i < stones.length; i++) {
+      (i.isEven ? left : right).add(stones[i]);
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+            child: Column(
+          children: left
+              .map((s) => _GemCard(
+                  s, photos, refresh, _cardHeight(s)))
+              .toList(),
+        )),
+        const SizedBox(width: 10),
+        Expanded(
+            child: Column(
+          children: right
+              .map((s) => _GemCard(
+                  s, photos, refresh, _cardHeight(s)))
+              .toList(),
+        )),
+      ],
+    );
+  }
+}
+
+class _GemCard extends StatelessWidget {
+  const _GemCard(this.stone, this.photos, this.refresh, this.cardHeight);
+  final Map<String, dynamic> stone;
+  final List<Map<String, dynamic>> photos;
+  final Future<void> Function() refresh;
+  final double cardHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = stonePhotoUrl(stone, photos);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => Detail(stone, refresh))),
+        onLongPress: () => showStonePreview(context, stone, url),
+        child: Column(
+          children: [
+            LayoutBuilder(builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              return Stack(
+                children: [
+                  FacetedSwatch(
+                      width: w,
+                      height: cardHeight,
+                      imageUrl: url),
+                  if (stone['favorite'] == true)
+                    Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Icon(Icons.favorite,
+                            size: 14, color: accent)),
+                ],
+              );
+            }),
+            const SizedBox(height: 6),
+            Text(
+              stone['name'] ?? 'Unnamed',
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: muted),
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -619,24 +1162,72 @@ enum HuntFilter {
 class Profile extends StatelessWidget {
   const Profile(this.stones, this.hunts, {super.key});
   final List stones, hunts;
+
+  Future<void> _editName(BuildContext context) async {
+    final controller =
+        TextEditingController(text: _nameNotifier.value);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Your name'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration:
+              const InputDecoration(hintText: 'Enter your name'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty) {
+      _nameNotifier.value = result;
+      await _saveName(result);
+    }
+  }
+
   @override
-  Widget build(BuildContext c) => SafeArea(
+  Widget build(BuildContext context) {
+    return SafeArea(
       child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(children: [
-            const CircleAvatar(radius: 34, child: Icon(Icons.person, size: 32)),
-            const SizedBox(height: 14),
-            const Text('Your little museum',
-                style: TextStyle(fontSize: 28, fontStyle: FontStyle.italic)),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            // Avatar + name
+            const CircleAvatar(
+                radius: 34, child: Icon(Icons.person, size: 32)),
+            const SizedBox(height: 10),
+            ValueListenableBuilder<String>(
+              valueListenable: _nameNotifier,
+              builder: (_, name, __) => Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text("$name's cabinet",
+                      style: serif(22, weight: FontWeight.w600)),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => _editName(context),
+                    child: Icon(Icons.edit_outlined,
+                        size: 15, color: muted),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 28),
             Stats(stones.length, hunts.length),
             const SizedBox(height: 32),
-            // ── Theme picker ──────────────────────────────────────────
+            // Theme picker
             Text('Appearance',
                 style: TextStyle(
-                    fontSize: 13,
-                    color: muted,
-                    letterSpacing: .8)),
+                    fontSize: 13, color: muted, letterSpacing: .8)),
             const SizedBox(height: 16),
             ListenableBuilder(
               listenable: _themeNotifier,
@@ -649,7 +1240,10 @@ class Profile extends StatelessWidget {
                           child: _ThemeCircle(
                             theme: t,
                             isSelected: _themeNotifier.value == t,
-                            onTap: () => _themeNotifier.value = t,
+                            onTap: () {
+                              _themeNotifier.value = t;
+                              _saveTheme(t);
+                            },
                           ),
                         ))
                     .toList(),
@@ -657,10 +1251,14 @@ class Profile extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             Text(
-                'Private, single-person collection\nNo account or login required.',
+                'Private collection · No account needed',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: muted))
-          ])));
+                style: TextStyle(color: muted)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class Stats extends StatelessWidget {
@@ -2530,6 +3128,159 @@ class _HalfCirclePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _HalfCirclePainter old) =>
       old.left != left || old.right != right;
+}
+
+// ── Faceted gem swatch ───────────────────────────────────────────────────────
+class FacetedSwatch extends StatelessWidget {
+  const FacetedSwatch({
+    required this.width,
+    required this.height,
+    this.imageUrl,
+    this.fallbackColor,
+    this.child,
+    super.key,
+  });
+  final double width, height;
+  final String? imageUrl;
+  final Color? fallbackColor;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = fallbackColor ?? imageBg;
+    Widget content = imageUrl != null && imageUrl!.isNotEmpty
+        ? Image.network(imageUrl!,
+            width: width,
+            height: height,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                Container(width: width, height: height, color: fill))
+        : Container(
+            width: width,
+            height: height,
+            color: fill,
+            child: child ??
+                Center(
+                    child: Icon(Icons.diamond_outlined,
+                        color: accent.withValues(alpha: .5),
+                        size: width * .35)));
+    return ClipPath(
+      clipper: _GemClipper(),
+      child: Stack(children: [
+        SizedBox(width: width, height: height, child: content),
+        // Light sheen overlay
+        Positioned.fill(
+            child: DecoratedBox(
+                decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                      Colors.white.withValues(alpha: .10),
+                      Colors.transparent,
+                      Colors.transparent,
+                    ],
+                        stops: const [0, .45, 1])))),
+      ]),
+    );
+  }
+}
+
+class _GemClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size s) {
+    final w = s.width;
+    final h = s.height;
+    return Path()
+      ..moveTo(w * .18, 0)
+      ..lineTo(w * .82, 0)
+      ..lineTo(w, h * .22)
+      ..lineTo(w, h * .78)
+      ..lineTo(w * .82, h)
+      ..lineTo(w * .12, h)
+      ..lineTo(0, h * .78)
+      ..lineTo(0, h * .22)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+// ── Hero frame (bordered panel with gradient wash) ────────────────────────────
+class HeroFrame extends StatelessWidget {
+  const HeroFrame({required this.child, super.key});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: accent.withValues(alpha: .18), width: 1),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            accent.withValues(alpha: .07),
+            _themeNotifier.value.card,
+          ],
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(21),
+        child: Stack(children: [
+          child,
+          // Sheen overlay
+          Positioned.fill(
+              child: DecoratedBox(
+                  decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                        Colors.white.withValues(alpha: .04),
+                        Colors.transparent,
+                        Colors.transparent,
+                      ],
+                          stops: const [0, .4, 1])))),
+        ]),
+      ),
+    );
+  }
+}
+
+// ── Ornamental diamond divider ────────────────────────────────────────────────
+class OrnamentDivider extends StatelessWidget {
+  const OrnamentDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final lineColor = accent.withValues(alpha: .28);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        children: [
+          Expanded(
+              child: Container(
+                  height: 1,
+                  decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                          colors: [Colors.transparent, lineColor])))),
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text('◆',
+                  style: TextStyle(color: accent, fontSize: 9))),
+          Expanded(
+              child: Container(
+                  height: 1,
+                  decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                          colors: [lineColor, Colors.transparent])))),
+        ],
+      ),
+    );
+  }
 }
 
 class LoadingScreen extends StatefulWidget {
