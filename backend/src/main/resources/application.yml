@@ -1,8 +1,9 @@
 spring:
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/litha}
-    username: ${DATABASE_USERNAME:postgres}
-    password: ${DATABASE_PASSWORD:postgres}
+    url: ${DATABASE_URL:jdbc:h2:mem:lithadb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: ${DATABASE_DRIVER:org.h2.Driver}
   jpa:
     hibernate:
       ddl-auto: update
