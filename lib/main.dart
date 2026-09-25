@@ -1,67 +1,343 @@
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'local_store.dart';
 
-void main() async {
+// ── CUSTOM VECTOR LINE ICONS (FROM ICON SHEET) ────────────────────────────────
+
+class CrescentMoonIcon extends StatelessWidget {
+  const CrescentMoonIcon({this.size = 12, this.color, super.key});
+  final double size;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _CrescentMoonPainter(color ?? muted)),
+    );
+  }
+}
+
+class _CrescentMoonPainter extends CustomPainter {
+  final Color color;
+  _CrescentMoonPainter(this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+    final w = size.width;
+    final h = size.height;
+    final path = Path()
+      ..moveTo(w * 0.7, h * 0.1)
+      ..arcToPoint(Offset(w * 0.7, h * 0.9), radius: Radius.circular(w * 0.45), clockwise: true)
+      ..arcToPoint(Offset(w * 0.7, h * 0.1), radius: Radius.circular(w * 0.35), clockwise: false);
+    canvas.drawPath(path, paint);
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class DiamondOrnamentIcon extends StatelessWidget {
+  const DiamondOrnamentIcon({this.size = 10, this.color, super.key});
+  final double size;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _DiamondOrnamentPainter(color ?? accent)),
+    );
+  }
+}
+
+class _DiamondOrnamentPainter extends CustomPainter {
+  final Color color;
+  _DiamondOrnamentPainter(this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final w = size.width;
+    final h = size.height;
+    final path = Path()
+      ..moveTo(w * 0.5, 0)
+      ..lineTo(w, h * 0.5)
+      ..lineTo(w * 0.5, h)
+      ..lineTo(0, h * 0.5)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class HexagonOutlineIcon extends StatelessWidget {
+  const HexagonOutlineIcon({this.size = 12, this.color, super.key});
+  final double size;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _HexagonOutlinePainter(color ?? muted)),
+    );
+  }
+}
+
+class _HexagonOutlinePainter extends CustomPainter {
+  final Color color;
+  _HexagonOutlinePainter(this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..strokeJoin = StrokeJoin.round;
+    final w = size.width;
+    final h = size.height;
+    final path = Path()
+      ..moveTo(w * 0.5, 0)
+      ..lineTo(w, h * 0.25)
+      ..lineTo(w, h * 0.75)
+      ..lineTo(w * 0.5, h)
+      ..lineTo(0, h * 0.75)
+      ..lineTo(0, h * 0.25)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class ThinMagnifyingGlassIcon extends StatelessWidget {
+  const ThinMagnifyingGlassIcon({this.size = 12, this.color, super.key});
+  final double size;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _MagnifyingGlassPainter(color ?? muted, strokeWidth: 1.2)),
+    );
+  }
+}
+
+class _MagnifyingGlassPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+  _MagnifyingGlassPainter(this.color, {required this.strokeWidth});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    final r = size.width * 0.32;
+    final center = Offset(size.width * 0.38, size.height * 0.38);
+    canvas.drawCircle(center, r, paint);
+    final hStart = Offset(size.width * 0.6, size.height * 0.6);
+    final hEnd = Offset(size.width * 0.88, size.height * 0.88);
+    canvas.drawLine(hStart, hEnd, paint);
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class HouseTabIcon extends StatelessWidget {
+  const HouseTabIcon({this.size = 20, this.color, super.key});
+  final double size;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _HouseTabPainter(color ?? muted)),
+    );
+  }
+}
+
+class _HouseTabPainter extends CustomPainter {
+  final Color color;
+  _HouseTabPainter(this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final w = size.width;
+    final h = size.height;
+    final path = Path()
+      ..moveTo(w * 0.12, h * 0.45)
+      ..lineTo(w * 0.5, h * 0.12)
+      ..lineTo(w * 0.88, h * 0.45)
+      ..lineTo(w * 0.8, h * 0.9)
+      ..lineTo(w * 0.2, h * 0.9)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class OverlappingCirclesTabIcon extends StatelessWidget {
+  const OverlappingCirclesTabIcon({this.size = 20, this.color, super.key});
+  final double size;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _OverlappingCirclesPainter(color ?? muted)),
+    );
+  }
+}
+
+class _OverlappingCirclesPainter extends CustomPainter {
+  final Color color;
+  _OverlappingCirclesPainter(this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    final r = size.width * 0.3;
+    canvas.drawCircle(Offset(size.width * 0.36, size.height * 0.5), r, paint);
+    canvas.drawCircle(Offset(size.width * 0.64, size.height * 0.5), r, paint);
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+class BoldMagnifyingGlassTabIcon extends StatelessWidget {
+  const BoldMagnifyingGlassTabIcon({this.size = 20, this.color, super.key});
+  final double size;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _MagnifyingGlassPainter(color ?? muted, strokeWidth: 2.1)),
+    );
+  }
+}
+
+class HeadShouldersTabIcon extends StatelessWidget {
+  const HeadShouldersTabIcon({this.size = 20, this.color, super.key});
+  final double size;
+  final Color? color;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _HeadShouldersPainter(color ?? muted)),
+    );
+  }
+}
+
+class _HeadShouldersPainter extends CustomPainter {
+  final Color color;
+  _HeadShouldersPainter(this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    final w = size.width;
+    final h = size.height;
+    canvas.drawCircle(Offset(w * 0.5, h * 0.34), w * 0.2, paint);
+    final path = Path()
+      ..moveTo(w * 0.18, h * 0.88)
+      ..cubicTo(w * 0.22, h * 0.62, w * 0.78, h * 0.62, w * 0.82, h * 0.88);
+    canvas.drawPath(path, paint);
+  }
+  @override
+  bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await _loadPrefs();
+  _loadPrefs().catchError((_) {});
   runApp(const LithaApp());
 }
 
 class Api {
-  static final url = _baseUrl();
-  static String _baseUrl() {
-    const configured = String.fromEnvironment('API_URL', defaultValue: '');
-    if (configured.isNotEmpty) return configured;
-    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android
-        ? 'http://10.0.2.2:9090'
-        : 'http://localhost:9090';
-  }
-
-  static const headers = {'Content-Type': 'application/json'};
   static Future<List<Map<String, dynamic>>> getAll(String route) async {
-    final response = await http.get(Uri.parse('$url/api/$route'));
-    _check(response);
-    return (jsonDecode(response.body) as List)
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    return LocalStore.getAll(route);
   }
 
-  static Future<void> save(String route, Map<String, dynamic> value,
+  static Future<Map<String, dynamic>> save(String route, Map<String, dynamic> value,
       {int? id}) async {
-    final uri = Uri.parse('$url/api/$route${id == null ? '' : '/$id'}');
-    final response = id == null
-        ? await http.post(uri, headers: headers, body: jsonEncode(value))
-        : await http.put(uri, headers: headers, body: jsonEncode(value));
-    _check(response);
+    return LocalStore.save(route, value, id: id);
   }
 
   static Future<void> remove(String route, int id) async {
-    final r = await http.delete(Uri.parse('$url/api/$route/$id'));
-    _check(r);
+    await LocalStore.remove(route, id);
   }
 
   static Future<String> upload(XFile file) async {
-    final request =
-        http.MultipartRequest('POST', Uri.parse('$url/api/uploads'));
-    request.files.add(http.MultipartFile.fromBytes(
-        'file', await file.readAsBytes(),
-        filename: file.name));
-    final response = await http.Response.fromStream(await request.send());
-    _check(response);
-    return '$url${jsonDecode(response.body)['path']}';
+    return LocalStore.copyPhoto(file);
   }
+}
 
-  static void _check(http.Response r) {
-    if (r.statusCode < 200 || r.statusCode >= 300)
-      throw Exception('API error ${r.statusCode}: ${r.body}');
+class OfflineImage extends StatelessWidget {
+  const OfflineImage(this.path,
+      {this.width, this.height, this.fit, this.errorBuilder, super.key});
+
+  final String path;
+  final double? width;
+  final double? height;
+  final BoxFit? fit;
+  final ImageErrorWidgetBuilder? errorBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    if (kIsWeb) {
+      if (path.startsWith('data:image/')) {
+        return Image.memory(
+          base64Decode(path.substring(path.indexOf(',') + 1)),
+          width: width,
+          height: height,
+          fit: fit,
+          errorBuilder: errorBuilder,
+        );
+      }
+      return errorBuilder?.call(
+              context, StateError('Photo is not stored in this browser'), StackTrace.current) ??
+          SizedBox(width: width, height: height);
+    }
+    return Image.file(
+      File(path),
+      width: width,
+      height: height,
+      fit: fit,
+      errorBuilder: errorBuilder,
+    );
   }
 }
 
@@ -181,7 +457,8 @@ TextStyle serif(double size,
     {FontWeight weight = FontWeight.w400,
     FontStyle style = FontStyle.normal,
     Color? color}) =>
-    GoogleFonts.cormorantGaramond(
+    TextStyle(
+        fontFamily: 'serif',
         fontSize: size,
         fontWeight: weight,
         fontStyle: style,
@@ -189,14 +466,12 @@ TextStyle serif(double size,
 
 // Tracked caps — Cinzel
 TextStyle caps(double size, {Color? color}) =>
-    GoogleFonts.cinzel(
+    TextStyle(
+        fontFamily: 'serif',
         fontSize: size,
         letterSpacing: 1.8,
         fontWeight: FontWeight.w500,
         color: color ?? accent);
-
-// Temporary preview delay for the loading screen. Set to Duration.zero to remove it.
-const loadingScreenPreviewDuration = Duration(seconds: 5);
 
 class LithaApp extends StatelessWidget {
   const LithaApp({super.key});
@@ -229,7 +504,6 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   int tab = 0;
   late final PageController pageController;
-  bool showingLoadingPreview = true;
   bool busy = true;
   String? error;
   List<Map<String, dynamic>> stones = [], hunts = [], photos = [];
@@ -238,9 +512,6 @@ class _ShellState extends State<Shell> {
     super.initState();
     pageController = PageController(initialPage: tab);
     refresh();
-    Future.delayed(loadingScreenPreviewDuration, () {
-      if (mounted) setState(() => showingLoadingPreview = false);
-    });
   }
 
   @override
@@ -273,7 +544,7 @@ class _ShellState extends State<Shell> {
 
   @override
   Widget build(BuildContext c) {
-    final isLoading = showingLoadingPreview || (busy && stones.isEmpty);
+    final isLoading = busy && stones.isEmpty;
     final pages = [
       Home(stones, hunts, photos, refresh),
       Collection(stones, photos, refresh),
@@ -338,7 +609,7 @@ class _ShellState extends State<Shell> {
                           spreadRadius: 3),
                     ],
                   ),
-                  child: const Icon(Icons.add, color: Colors.white),
+                  child: const Center(child: Text('+', style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.w300))),
                 )),
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
         bottomNavigationBar: isLoading
@@ -348,15 +619,23 @@ class _ShellState extends State<Shell> {
                 onDestinationSelected: (v) => pageController.animateToPage(v,
                     duration: const Duration(milliseconds: 320),
                     curve: Curves.easeOutCubic),
-                destinations: const [
+                destinations: [
                     NavigationDestination(
-                        icon: Icon(Icons.home_outlined), label: 'Home'),
+                        icon: HouseTabIcon(size: 20, color: muted),
+                        selectedIcon: HouseTabIcon(size: 20, color: accent),
+                        label: 'Home'),
                     NavigationDestination(
-                        icon: Icon(Icons.diamond_outlined), label: 'Stones'),
+                        icon: OverlappingCirclesTabIcon(size: 20, color: muted),
+                        selectedIcon: OverlappingCirclesTabIcon(size: 20, color: accent),
+                        label: 'Stones'),
                     NavigationDestination(
-                        icon: Icon(Icons.explore_outlined), label: 'Hunt'),
+                        icon: BoldMagnifyingGlassTabIcon(size: 20, color: muted),
+                        selectedIcon: BoldMagnifyingGlassTabIcon(size: 20, color: accent),
+                        label: 'Hunt'),
                     NavigationDestination(
-                        icon: Icon(Icons.person_outline), label: 'Me')
+                        icon: HeadShouldersTabIcon(size: 20, color: muted),
+                        selectedIcon: HeadShouldersTabIcon(size: 20, color: accent),
+                        label: 'Me')
                   ]));
   }
 
@@ -437,9 +716,8 @@ class Home extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text('☽ ',
-                              style: TextStyle(
-                                  fontSize: 12, color: muted)),
+                          CrescentMoonIcon(size: 13, color: muted),
+                          const SizedBox(width: 6),
                           Text(_greeting(),
                               style:
                                   TextStyle(fontSize: 13, color: muted)),
@@ -471,7 +749,7 @@ class Home extends StatelessWidget {
                                 topLeft: Radius.circular(21),
                                 topRight: Radius.circular(21)),
                             child: heroUrl != null
-                                ? Image.network(
+                                ? OfflineImage(
                                     heroUrl,
                                     width: double.infinity,
                                     height: 240,
@@ -730,7 +1008,7 @@ class _HuntTeaser extends StatelessWidget {
                     style:
                         TextStyle(fontSize: 12, color: muted)),
               ])),
-          Icon(Icons.chevron_right, color: muted, size: 18),
+          Text('›', style: TextStyle(fontSize: 20, color: muted, fontWeight: FontWeight.w400)),
         ]),
       ),
     );
@@ -805,8 +1083,7 @@ class _CollectionState extends State<Collection> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Icon(Icons.hexagon_outlined,
-                        size: 12, color: muted),
+                    HexagonOutlineIcon(size: 12, color: muted),
                     const SizedBox(width: 6),
                     Text('Specimens kept',
                         style: TextStyle(fontSize: 13, color: muted)),
@@ -825,7 +1102,7 @@ class _CollectionState extends State<Collection> {
                 onChanged: (v) => setState(() => q = v),
                 style: TextStyle(fontSize: 14),
                 decoration: InputDecoration(
-                  prefixIcon: Icon(Icons.search, size: 18),
+                  prefixIcon: Center(widthFactor: 1, heightFactor: 1, child: Text('⌕', style: TextStyle(fontSize: 18, color: muted))),
                   hintText: 'Search your stones',
                   contentPadding:
                       const EdgeInsets.symmetric(vertical: 10),
@@ -1001,8 +1278,7 @@ class _GemCard extends StatelessWidget {
                     Positioned(
                         top: 8,
                         right: 8,
-                        child: Icon(Icons.favorite,
-                            size: 14, color: accent)),
+                        child: Text('♥', style: TextStyle(fontSize: 14, color: accent))),
                 ],
               );
             }),
@@ -1092,7 +1368,7 @@ class _HuntState extends State<Hunt> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
-                      Icon(Icons.search, size: 12, color: muted),
+                      ThinMagnifyingGlassIcon(size: 12, color: muted),
                       const SizedBox(width: 6),
                       Text('Still searching',
                           style: TextStyle(fontSize: 13, color: muted)),
@@ -1135,7 +1411,7 @@ class _HuntState extends State<Hunt> {
             onChanged: (v) => setState(() => q = v),
             style: const TextStyle(fontSize: 14),
             decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.search, size: 18),
+              prefixIcon: Center(widthFactor: 1, heightFactor: 1, child: Text('⌕', style: TextStyle(fontSize: 18, color: muted))),
               hintText: 'Search the hunt',
               contentPadding: const EdgeInsets.symmetric(vertical: 10),
               filled: true,
@@ -1455,7 +1731,7 @@ class StoneTile extends StatelessWidget {
                       color: accent))
               : ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.network(photoUrl!,
+                  child: OfflineImage(photoUrl!,
                       width: 52,
                       height: 52,
                       fit: BoxFit.cover,
@@ -1509,7 +1785,7 @@ class StoneCard extends StatelessWidget {
                             alignment: Alignment.center,
                             child: Icon(Icons.diamond_outlined,
                                 size: 42, color: accent))
-                        : Image.network(imageUrl,
+                        : OfflineImage(imageUrl,
                             width: double.infinity,
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) =>
@@ -1721,7 +1997,7 @@ class _StonePreviewFront extends StatelessWidget {
                 child: Center(
                     child: Icon(Icons.diamond_outlined,
                         size: 80, color: accent)))
-            : Image.network(imageUrl!,
+            : OfflineImage(imageUrl!,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
                     color: imageBg,
@@ -2163,7 +2439,7 @@ class HuntCard extends StatelessWidget {
                     top: 8,
                     right: 8,
                     child: Chip(
-                        label: Text('FOUND'),
+                        label: Text('✦  FOUND  ✦'),
                         labelStyle: TextStyle(fontSize: 11),
                         visualDensity: VisualDensity.compact))
             ])),
@@ -2195,7 +2471,7 @@ class HuntImage extends StatelessWidget {
     final fallbackIcon = Icon(Icons.explore_outlined,
         color: accent, size: size == null ? 42 : 28);
     Widget inner = url != null && url!.isNotEmpty
-        ? Image.network(url!,
+        ? OfflineImage(url!,
             width: sz,
             height: sz,
             fit: BoxFit.cover,
@@ -2287,7 +2563,7 @@ class _HuntDetailState extends State<HuntDetail> {
               if ((hunt['referenceImageUrl'] ?? '').toString().isNotEmpty)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(18),
-                  child: Image.network(
+                  child: OfflineImage(
                     hunt['referenceImageUrl'],
                     width: double.infinity,
                     fit: BoxFit.cover,
@@ -2366,18 +2642,14 @@ Future<void> setHuntFound(BuildContext c, Map<String, dynamic> hunt,
     if (photoChoice == null) return;
     final rating = await chooseStoneRating(c);
     if (rating == null) return;
-    final response = await http.post(Uri.parse('${Api.url}/api/stones'),
-        headers: Api.headers,
-        body: jsonEncode({
-          'name': hunt['name'] ?? 'Found stone',
-          'description': hunt['description'] ?? '',
-          'whyKept': 'Found from The Hunt.',
-          'acquisitionType': 'FOUND',
-          'favorite': false,
-          'rating': rating
-        }));
-    Api._check(response);
-    final stone = Map<String, dynamic>.from(jsonDecode(response.body));
+    final stone = await Api.save('stones', {
+      'name': hunt['name'] ?? 'Found stone',
+      'description': hunt['description'] ?? '',
+      'whyKept': 'Found from The Hunt.',
+      'acquisitionType': 'FOUND',
+      'favorite': false,
+      'rating': rating
+    });
     String? imageUrl = photoChoice.referenceUrl;
     if (photoChoice.file != null)
       imageUrl = await Api.upload(photoChoice.file!);
@@ -2393,7 +2665,7 @@ Future<void> setHuntFound(BuildContext c, Map<String, dynamic> hunt,
     changes = {
       'status': 'FOUND',
       'foundAt': DateTime.now().toIso8601String().substring(0, 10),
-      'stone': {'id': stone['id']}
+      'stone': stone
     };
   }
   final saved = Map<String, dynamic>.of(hunt)..addAll(changes);
@@ -2590,8 +2862,8 @@ class _DetailState extends State<Detail> {
                       GestureDetector(
                         onTap: () => Navigator.pop(c),
                         child: Row(children: [
-                          Icon(Icons.arrow_back_ios_new_rounded,
-                              size: 14, color: muted),
+                          Text('← ',
+                              style: TextStyle(fontSize: 16, color: muted, fontWeight: FontWeight.bold)),
                           const SizedBox(width: 4),
                           Text('Back to stones',
                               style: TextStyle(fontSize: 13, color: muted)),
@@ -2632,7 +2904,7 @@ class _DetailState extends State<Detail> {
                             ? ClipRRect(
                                 borderRadius:
                                     const BorderRadius.all(Radius.circular(21)),
-                                child: Image.network(
+                                child: OfflineImage(
                                   photos.first['imageUrl']?.toString() ?? '',
                                   width: double.infinity,
                                   height: 280,
@@ -2679,14 +2951,14 @@ class _DetailState extends State<Detail> {
                                     color: accent.withValues(alpha: .3),
                                     width: 1),
                               ),
-                              child: Icon(
-                                stone['favorite'] == true
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: stone['favorite'] == true
-                                    ? accent
-                                    : muted,
-                                size: 18,
+                              child: Center(
+                                child: Text(
+                                  stone['favorite'] == true ? '♥' : '♡',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: stone['favorite'] == true ? accent : muted,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -2708,12 +2980,12 @@ class _DetailState extends State<Detail> {
 
                     // ── Data table ────────────────────────────────────────
                     Container(
-                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      margin: const EdgeInsets.symmetric(vertical: 4),
                       decoration: BoxDecoration(
-                        color: card,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color: accent.withValues(alpha: .18), width: 1),
+                        border: Border.symmetric(
+                          vertical: BorderSide(
+                              color: accent.withValues(alpha: .14), width: 1),
+                        ),
                       ),
                       child: Column(
                         children: [
@@ -2722,7 +2994,6 @@ class _DetailState extends State<Detail> {
                             (stone['acquisitionDate'] ?? '').toString().isNotEmpty
                                 ? stone['acquisitionDate'].toString()
                                 : 'Not specified',
-                            isFirst: true,
                           ),
                           _DataRow(
                             'How',
@@ -2733,7 +3004,6 @@ class _DetailState extends State<Detail> {
                             (stone['place'] ?? '').toString().isNotEmpty
                                 ? stone['place'].toString()
                                 : 'Not specified',
-                            isLast: true,
                           ),
                         ],
                       ),
@@ -2818,7 +3088,7 @@ class _DetailState extends State<Detail> {
                         child: Row(children: [
                           ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
+                              child: OfflineImage(
                                   p['imageUrl']?.toString() ?? '',
                                   width: 56,
                                   height: 56,
@@ -2928,36 +3198,34 @@ class _DetailState extends State<Detail> {
 }
 
 class _DataRow extends StatelessWidget {
-  const _DataRow(this.label, this.value,
-      {this.isFirst = false, this.isLast = false});
+  const _DataRow(this.label, this.value);
   final String label, value;
-  final bool isFirst, isLast;
 
   @override
   Widget build(BuildContext context) => Column(children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
           child: Row(children: [
-            SizedBox(
-                width: 90,
-                child: Text(label,
-                    style: TextStyle(fontSize: 13, color: muted))),
+            Text(label, style: TextStyle(fontSize: 13, color: muted)),
+            const Spacer(),
+            const SizedBox(width: 20),
             Expanded(
                 child: Text(value,
+                    textAlign: TextAlign.right,
                     style: TextStyle(
                         fontSize: 14,
-                        color: value == 'Not specified' ? muted : null,
+                        fontWeight: FontWeight.w600,
+                        color: value == 'Not specified' ? muted : textColor,
                         fontStyle: value == 'Not specified'
                             ? FontStyle.italic
                             : FontStyle.normal))),
           ]),
         ),
-        if (!isLast)
-          Divider(
-              height: 1,
-              color: accent.withValues(alpha: .12),
-              indent: 16,
-              endIndent: 16),
+        Divider(
+            height: 1,
+            color: accent.withValues(alpha: .16),
+            indent: 20,
+            endIndent: 20),
       ]);
 }
 
@@ -3024,10 +3292,8 @@ class _StoneWizardState extends State<StoneWizard> {
         'favorite': favorite,
         'rating': rating
       };
-      final response = await http.post(Uri.parse('${Api.url}/api/stones'),
-          headers: Api.headers, body: jsonEncode(stone));
-      Api._check(response);
-      final id = jsonDecode(response.body)['id'];
+      final savedStone = await Api.save('stones', stone);
+      final id = savedStone['id'];
       if (photo != null) {
         final imageUrl = await Api.upload(photo!);
         await Api.save('stone-photos', {
@@ -3774,7 +4040,7 @@ class FacetedSwatch extends StatelessWidget {
     final br = BorderRadius.circular(radius);
 
     Widget content = imageUrl != null && imageUrl!.isNotEmpty
-        ? Image.network(imageUrl!,
+        ? OfflineImage(imageUrl!,
             width: width,
             height: height,
             fit: BoxFit.cover,
@@ -4165,7 +4431,7 @@ class Offline extends StatelessWidget {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.cloud_off, size: 40, color: accent),
             const SizedBox(height: 12),
-            const Text('Cannot reach the API'),
+            const Text('Cannot open local storage'),
             Text(error,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: muted)),

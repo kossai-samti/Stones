@@ -1,17 +1,22 @@
-# stone
+# Litha
 
-A new Flutter project.
+Litha is a private, offline Flutter collection journal. Stones, hunt items,
+memories, and photos are stored only on the device.
 
-## Getting Started
+## Build an Android APK
 
-This project is a starting point for a Flutter application.
+```powershell
+flutter pub get
+flutter build apk
+```
 
-A few resources to get you started if this is your first Flutter project:
+The resulting APK is at `build\app\outputs\flutter-apk\app-release.apk`.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Data and photos
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Records are stored in an on-device SQLite database. Photos picked from the
+camera or gallery are copied into the app's private storage, so the app does
+not need an internet connection, a server, or PostgreSQL.
+
+Uninstalling the app removes its private data. Add an export or backup feature
+before moving to another phone if the saved collection needs to be retained.
