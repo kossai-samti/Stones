@@ -2321,45 +2321,76 @@ class _StoneFlipPreviewState extends State<StoneFlipPreview>
       : flip.forward();
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _flipCurved,
-        builder: (_, __) {
-          final v = _flipCurved.value;
-          final reversing = flip.status == AnimationStatus.reverse;
-          final showingBack = !reversing && v >= .5;
-          final angle = v * math.pi;
-          return GestureDetector(
-            onTap: toggle,
-            child: SizedBox(
-              width: 300,
-              height: 300,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.identity()
-                      ..setEntry(3, 2, .0012)
-                      ..rotateY(angle),
-                    child: showingBack
-                        ? Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.identity()..rotateY(math.pi),
-                            child: _StonePreviewBack(
-                              stone: widget.stone,
-                              imageUrl: widget.imageUrl,
-                            ),
-                          )
-                        : _StonePreviewFront(
-                            stone: widget.stone,
-                            imageUrl: widget.imageUrl,
-                          ),
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: toggle,
+        child: SizedBox(
+          width: 300,
+          height: 300,
+          child: AnimatedBuilder(
+            animation: _flipCurved,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _FlipFace(
+                  faceKey: 'front',
+                  animation: _flipCurved,
+                  showWhen: (v) => v < .5,
+                  child: _StonePreviewFront(
+                    stone: widget.stone,
+                    imageUrl: widget.imageUrl,
                   ),
-                ],
-              ),
+                ),
+                _FlipFace(
+                  faceKey: 'back',
+                  animation: _flipCurved,
+                  showWhen: (v) => v >= .5,
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()..rotateY(math.pi),
+                    child: _StonePreviewBack(
+                      stone: widget.stone,
+                      imageUrl: widget.imageUrl,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          );
-        },
+            builder: (_, child) => Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, .0012)
+                ..rotateY(_flipCurved.value * math.pi),
+              child: child,
+            ),
+          ),
+        ),
+      );
+}
+
+class _FlipFace extends StatelessWidget {
+  const _FlipFace({
+    required this.animation,
+    required this.showWhen,
+    required this.child,
+    required this.faceKey,
+  });
+  final Animation<double> animation;
+  final bool Function(double) showWhen;
+  final Widget child;
+  final String faceKey;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: animation,
+        child: child,
+        builder: (_, child) => Visibility(
+          key: ValueKey(faceKey),
+          visible: showWhen(animation.value),
+          maintainState: true,
+          maintainAnimation: true,
+          maintainSize: true,
+          child: child!,
+        ),
       );
 }
 
